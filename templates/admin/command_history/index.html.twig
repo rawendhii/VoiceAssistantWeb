@@ -1,0 +1,95 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Command History</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Track executed voice commands across the system.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <form method="get" action="{{ path('admin_command_history') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by spoken text, user email, or command">
+            </div>
+
+            <div style="min-width:220px;">
+                <label for="status">Filter by Status</label>
+                <select id="status" name="status">
+                    <option value="">All</option>
+                    <option value="SUCCESS" {% if statusFilter == 'SUCCESS' %}selected{% endif %}>SUCCESS</option>
+                    <option value="FAILED" {% if statusFilter == 'FAILED' %}selected{% endif %}>FAILED</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{{ path('admin_command_history') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:70px;">ID</th>
+                    <th>User Email</th>
+                    <th>Command</th>
+                    <th>Executed Text</th>
+                    <th>Status</th>
+                    <th>Executed At</th>
+                    <th style="width:140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for history in histories %}
+                <tr>
+                    <td>{{ history.id }}</td>
+                    <td>{{ history.user.email }}</td>
+<td>{{ history.command ? history.command.label : 'No match' }}</td>                    <td>{{ history.executedText }}</td>
+                    <td>
+                        {% if history.status == 'SUCCESS' %}
+                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:700; background:#dcfce7; color:#166534;">
+                                SUCCESS
+                            </span>
+                        {% else %}
+                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:700; background:#fee2e2; color:#991b1b;">
+                                FAILED
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>{{ history.executedAt ? history.executedAt|date('Y-m-d H:i') : '' }}</td>
+                    <td>
+                       <form method="post" action="{{ path('admin_command_history_delete', {id: history.id}) }}" onsubmit="return confirm('Delete this history record?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete_history_' ~ history.id) }}">
+    <button type="submit" class="btn btn-danger">Delete</button>
+</form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7">No command history found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalPages > 1 %}
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                {% for p in 1..totalPages %}
+                    <a href="{{ path('admin_command_history', {
+                        page: p,
+                        search: search,
+                        status: statusFilter
+                    }) }}"
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                        {{ p }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+    <h1>My Profile</h1>
+
+    <div class="card" style="max-width: 700px;">
+        <p><strong>Full Name:</strong> {{ user.fullName }}</p>
+        <p><strong>Email:</strong> {{ user.email }}</p>
+        <p><strong>Role:</strong> {{ user.role.name }}</p>
+    </div>
+{% endblock %}

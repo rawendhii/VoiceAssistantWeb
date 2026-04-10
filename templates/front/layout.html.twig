@@ -1,0 +1,127 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Front - Voice Assistant{% endblock %}
+
+{% block body %}
+    <div class="front-shell">
+        <aside class="front-sidebar" aria-label="User navigation">
+            <div class="front-brand">Assistant Vocal</div>
+            <div class="front-subtitle">Accessible Front Office</div>
+
+            <nav class="front-nav">
+                <a href="{{ path('front_home') }}"
+                   class="front-link {{ app.request.attributes.get('_route') == 'front_home' ? 'active' : '' }}">
+                    <i data-lucide="house"></i>
+                    <span>Home</span>
+                </a>
+
+                <a href="{{ path('front_voice_commands') }}"
+                   class="front-link {{ app.request.attributes.get('_route') == 'front_voice_commands' ? 'active' : '' }}">
+                    <i data-lucide="mic"></i>
+                    <span>Voice Commands</span>
+                </a>
+
+                <a href="{{ path('front_files') }}"
+                   class="front-link {{ app.request.attributes.get('_route') starts with 'front_files' ? 'active' : '' }}">
+                    <i data-lucide="folder"></i>
+                    <span>My Files</span>
+                </a>
+
+                <a href="{{ path('front_profile') }}"
+                   class="front-link {{ app.request.attributes.get('_route') == 'front_profile' ? 'active' : '' }}">
+                    <i data-lucide="user"></i>
+                    <span>Profile</span>
+                </a>
+            </nav>
+
+            <div class="front-sidebar-footer">
+                <a href="{{ path('app_logout') }}" class="front-link logout-link">
+                    <i data-lucide="log-out"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="front-main">
+            <div class="front-topbar">
+                <div class="front-topbar-title">Accessible User Area</div>
+                <div class="front-topbar-user">
+                    {% if app.user %}
+                        {{ app.user.fullName }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="front-content">
+                <div id="flash-container" aria-live="polite" aria-atomic="true">
+                    {% for message in app.flashes('success') %}
+                        <div class="flash flash-success js-speak-on-load">{{ message }}</div>
+                    {% endfor %}
+
+                    {% for message in app.flashes('error') %}
+                        <div class="flash flash-error js-speak-on-load">{{ message }}</div>
+                    {% endfor %}
+                </div>
+
+                <div id="globalVoiceAnnouncements" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+                {% block front_content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        function speakText(text) {
+            if (!('speechSynthesis' in window) || !text) {
+                return;
+            }
+
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function announceText(text) {
+            const region = document.getElementById('globalVoiceAnnouncements');
+            if (region) {
+                region.textContent = text;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const flashes = document.querySelectorAll('.flash');
+            const speakableFlashes = document.querySelectorAll('.js-speak-on-load');
+
+            if (speakableFlashes.length > 0) {
+                const messages = Array.from(speakableFlashes).map(el => el.textContent.trim()).filter(Boolean);
+                if (messages.length > 0) {
+                    setTimeout(function () {
+                        speakText(messages.join('. '));
+                    }, 300);
+                }
+            }
+
+            if (flashes.length > 0) {
+                setTimeout(function () {
+                    flashes.forEach(function (flash) {
+                        flash.classList.add('hide');
+
+                        setTimeout(function () {
+                            flash.remove();
+                        }, 500);
+                    });
+                }, 4000);
+            }
+
+            lucide.createIcons();
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Edit Managed File</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Update the selected file.</p>
+        </div>
+
+        <a href="{{ path('admin_managed_files') }}" class="btn btn-secondary">Back to list</a>
+    </div>
+
+    <div class="card" style="max-width:700px;">
+        <form method="post" action="{{ path('admin_managed_files_update', {id: file.id}) }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('update_managed_file_' ~ file.id) }}">
+
+    <label for="userSearch">Search User by Email</label>
+    <input id="userSearch" type="text" placeholder="Type user email...">
+
+    <label for="user">User Email</label>
+    <select id="user" name="user" required>
+        {% for user in users %}
+            <option value="{{ user.id }}" {% if file.user and file.user.id == user.id %}selected{% endif %}>
+                {{ user.email }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <label for="fileName">File Name</label>
+    <input id="fileName" type="text" name="fileName" value="{{ file.fileName }}" required>
+
+    <label for="filePath">File Path</label>
+    <input id="filePath" type="text" name="filePath" value="{{ file.filePath }}" required>
+
+    <label for="fileType">File Type</label>
+    <input id="fileType" type="text" name="fileType" value="{{ file.fileType }}" required>
+
+    <button type="submit" class="btn">Update File</button>
+</form>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const searchInput = document.getElementById('userSearch');
+        const userSelect = document.getElementById('user');
+
+        if (!searchInput || !userSelect) {
+            return;
+        }
+
+        const originalOptions = Array.from(userSelect.options).map(option => ({
+            value: option.value,
+            text: option.text,
+            selected: option.selected
+        }));
+
+        searchInput.addEventListener('input', function () {
+            const keyword = this.value.toLowerCase().trim();
+            const currentValue = userSelect.value;
+
+            userSelect.innerHTML = '';
+
+            originalOptions.forEach(option => {
+                if (option.text.toLowerCase().includes(keyword)) {
+                    const newOption = document.createElement('option');
+                    newOption.value = option.value;
+                    newOption.textContent = option.text;
+
+                    if (option.value === currentValue || option.selected) {
+                        newOption.selected = true;
+                    }
+
+                    userSelect.appendChild(newOption);
+                }
+            });
+        });
+    });
+    </script>
+{% endblock %}

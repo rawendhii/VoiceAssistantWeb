@@ -1,0 +1,99 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Users Management</h1>
+        </div>
+
+        <a href="{{ path('admin_users_create') }}" class="btn">+ New User</a>
+    </div>
+
+    <div class="card">
+        <form method="get" action="{{ path('admin_users') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by name or email">
+            </div>
+
+            <div style="min-width:220px;">
+                <label for="role">Filter by Role</label>
+                <select id="role" name="role">
+                    <option value="">All roles</option>
+                    {% for role in roles %}
+                        <option value="{{ role.id }}" {% if roleFilter == role.id ~ '' %}selected{% endif %}>
+                            {{ role.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{{ path('admin_users') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:70px;">ID</th>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th style="width:220px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.fullName }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        <span style="
+                            display:inline-block;
+                            padding:6px 10px;
+                            border-radius:999px;
+                            font-size:13px;
+                            font-weight:700;
+                            {% if user.role and user.role.name == 'ADMIN' %}
+                                background:#dbeafe; color:#1d4ed8;
+                            {% else %}
+                                background:#e5e7eb; color:#374151;
+                            {% endif %}
+                        ">
+                            {{ user.role.name }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ path('admin_users_edit', {id: user.id}) }}" class="btn">Edit</a>
+
+                       <form method="post" action="{{ path('admin_users_delete', {id: user.id}) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this user?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete_user_' ~ user.id) }}">
+    <button type="submit" class="btn btn-danger">Delete</button>
+</form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5">No users found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalPages > 1 %}
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                {% for p in 1..totalPages %}
+                    <a href="{{ path('admin_users', {page: p, search: search, role: roleFilter}) }}"
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                        {{ p }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

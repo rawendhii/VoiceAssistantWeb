@@ -1,0 +1,36 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+    <h1>Voice Commands</h1>
+
+    <div class="card">
+        <p>These are the active voice commands available for the assistant.</p>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 70px;">ID</th>
+                    <th>Label</th>
+                    <th>Keyword</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for command in commands %}
+                <tr>
+                    <td>{{ command.id }}</td>
+                    <td>{{ command.label }}</td>
+                    <td>{{ command.keyword }}</td>
+                    <td>{{ command.description }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4">No active voice commands found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

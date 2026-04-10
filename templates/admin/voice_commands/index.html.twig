@@ -1,0 +1,94 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Voice Commands</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Manage spoken commands for the voice assistant.</p>
+        </div>
+
+        <a href="{{ path('admin_voice_commands_create') }}" class="btn">+ New Command</a>
+    </div>
+
+    <div class="card">
+        <form method="get" action="{{ path('admin_voice_commands') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by label, keyword, or description">
+            </div>
+
+            <div style="min-width:220px;">
+                <label for="status">Filter by Status</label>
+                <select id="status" name="status">
+                    <option value="">All</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{{ path('admin_voice_commands') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:70px;">ID</th>
+                    <th>Label</th>
+                    <th>Keyword</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th style="width:220px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for command in commands %}
+                <tr>
+                    <td>{{ command.id }}</td>
+                    <td>{{ command.label }}</td>
+                    <td>{{ command.keyword }}</td>
+                    <td>{{ command.description }}</td>
+                    <td>
+                        {% if command.active %}
+                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:700; background:#dcfce7; color:#166534;">
+                                Active
+                            </span>
+                        {% else %}
+                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:700; background:#fee2e2; color:#991b1b;">
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ path('admin_voice_commands_edit', {id: command.id}) }}" class="btn">Edit</a>
+
+                        <form method="post" action="{{ path('admin_voice_commands_delete', {id: command.id}) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this voice command?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete_voice_command_' ~ command.id) }}">
+    <button type="submit" class="btn btn-danger">Delete</button>
+</form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="6">No voice commands found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalPages > 1 %}
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                {% for p in 1..totalPages %}
+                    <a href="{{ path('admin_voice_commands', {page: p, search: search, status: status}) }}"
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                        {{ p }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

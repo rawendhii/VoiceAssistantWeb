@@ -1,0 +1,35 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Create Voice Command</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Add a new command for the voice assistant.</p>
+        </div>
+
+        <a href="{{ path('admin_voice_commands') }}" class="btn btn-secondary">Back to list</a>
+    </div>
+
+    <div class="card" style="max-width:700px;">
+       <form method="post" action="{{ path('admin_voice_commands_store') }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('create_voice_command') }}">
+
+    <label for="label">Label</label>
+    <input id="label" type="text" name="label" required>
+
+    <label for="keyword">Keyword</label>
+    <input id="keyword" type="text" name="keyword" required>
+
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="4"></textarea>
+
+    <label for="active">Status</label>
+    <select id="active" name="active">
+        <option value="1">Active</option>
+        <option value="0">Inactive</option>
+    </select>
+
+    <button type="submit" class="btn">Create Command</button>
+</form>
+    </div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">My Files</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Manage your own files.</p>
+        </div>
+
+        <a href="{{ path('front_files_create') }}" class="btn">+ New File</a>
+    </div>
+
+    <div class="card">
+        <form method="get" action="{{ path('front_files') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by file name, path, or type">
+            </div>
+
+            <div style="min-width:200px;">
+                <label for="type">Filter by Type</label>
+                <select id="type" name="type">
+                    <option value="">All types</option>
+                    <option value="PDF" {% if typeFilter == 'PDF' %}selected{% endif %}>PDF</option>
+                    <option value="IMAGE" {% if typeFilter == 'IMAGE' %}selected{% endif %}>IMAGE</option>
+                    <option value="DOC" {% if typeFilter == 'DOC' %}selected{% endif %}>DOC</option>
+                    <option value="TXT" {% if typeFilter == 'TXT' %}selected{% endif %}>TXT</option>
+                </select>
+            </div>
+
+            <div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{{ path('front_files') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:70px;">ID</th>
+                    <th>File Name</th>
+                    <th>Path</th>
+                    <th>Type</th>
+                    <th>Created At</th>
+                    <th>Updated At</th>
+                    <th style="width:220px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for file in files %}
+                <tr>
+                    <td>{{ file.id }}</td>
+                    <td>{{ file.fileName }}</td>
+                    <td>{{ file.filePath }}</td>
+                    <td>{{ file.fileType }}</td>
+                    <td>{{ file.createdAt ? file.createdAt|date('Y-m-d H:i') : '' }}</td>
+                    <td>{{ file.updatedAt ? file.updatedAt|date('Y-m-d H:i') : '' }}</td>
+                    <td>
+                        <a href="{{ path('front_files_edit', {id: file.id}) }}" class="btn">Edit</a>
+                       <form method="post" action="{{ path('front_files_delete', {id: file.id}) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this file?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete_front_file_' ~ file.id) }}">
+    <button type="submit" class="btn btn-danger">Delete</button>
+</form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7">No files found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalPages > 1 %}
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                {% for p in 1..totalPages %}
+                    <a href="{{ path('front_files', {
+                        page: p,
+                        search: search,
+                        type: typeFilter
+                    }) }}"
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                        {{ p }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

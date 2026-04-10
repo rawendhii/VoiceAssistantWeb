@@ -1,0 +1,94 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Roles Management</h1>
+            <p class="page-subtitle">Create, update, and manage application roles.</p>
+        </div>
+    </div>
+
+    <div class="card" style="max-width: 720px;">
+        <div class="card-header">
+            <h3>Add New Role</h3>
+            <p>Create a new role for the platform.</p>
+        </div>
+
+        <form method="post" action="{{ path('admin_roles_create') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('create_role') }}">
+
+            <label for="name">Role Name</label>
+            <input id="name" type="text" name="name" placeholder="Example: ADMIN or CONTENT_MANAGER" required>
+
+            <button type="submit" class="btn">Add Role</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <form method="get" action="{{ path('admin_roles') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+            <div style="min-width:260px;">
+                <label for="search">Search</label>
+                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by role name">
+            </div>
+
+            <div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{{ path('admin_roles') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Name</th>
+                    <th style="width:170px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for role in roles %}
+                <tr>
+                    <td>{{ role.id }}</td>
+                    <td>
+                        <form method="post" action="{{ path('admin_roles_update', {id: role.id}) }}" style="display:flex; gap:10px; align-items:center; margin:0;">
+                            <input type="hidden" name="_token" value="{{ csrf_token('update_role_' ~ role.id) }}">
+                            <input type="text"
+                                   name="name"
+                                   value="{{ role.name }}"
+                                   required
+                                   style="margin:0; min-width:220px;">
+                            <button type="submit" class="btn">Update</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post"
+                              action="{{ path('admin_roles_delete', {id: role.id}) }}"
+                              style="display:inline-block; margin:0;"
+                              onsubmit="return confirm('Delete this role?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_role_' ~ role.id) }}">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3">No roles found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalPages > 1 %}
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                {% for p in 1..totalPages %}
+                    <a href="{{ path('admin_roles', {page: p, search: search}) }}"
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                        {{ p }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

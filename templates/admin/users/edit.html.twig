@@ -1,0 +1,38 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="margin:0;">Edit User</h1>
+            <p style="margin:6px 0 0; color:#6b7280;">Update the selected user account.</p>
+        </div>
+
+        <a href="{{ path('admin_users') }}" class="btn btn-secondary">Back to list</a>
+    </div>
+
+    <div class="card" style="max-width:700px;">
+       <form method="post" action="{{ path('admin_users_update', {id: user.id}) }}" autocomplete="off">
+    <input type="hidden" name="_token" value="{{ csrf_token('update_user_' ~ user.id) }}">
+
+    <label for="fullName">Full Name</label>
+    <input id="fullName" type="text" name="fullName" value="{{ user.fullName }}" required autocomplete="off">
+
+    <label for="email">Email</label>
+    <input id="email" type="email" name="email" value="{{ user.email }}" required autocomplete="off">
+
+    <label for="password">New Password (optional)</label>
+    <input id="password" type="password" name="password" autocomplete="new-password">
+
+    <label for="role">Role</label>
+    <select id="role" name="role" required>
+        {% for role in roles %}
+            <option value="{{ role.id }}" {% if user.role and user.role.id == role.id %}selected{% endif %}>
+                {{ role.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <button type="submit" class="btn">Update User</button>
+</form>
+    </div>
+{% endblock %}

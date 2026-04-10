@@ -1,0 +1,137 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">
+                Welcome back. Here is a complete overview of your platform activity.
+            </p>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="users"></i></div>
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value">{{ usersCount }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="shield"></i></div>
+            <div class="stat-label">Total Roles</div>
+            <div class="stat-value">{{ rolesCount }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="folder"></i></div>
+            <div class="stat-label">Managed Files</div>
+            <div class="stat-value">{{ filesCount }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="mic"></i></div>
+            <div class="stat-label">Voice Commands</div>
+            <div class="stat-value">{{ voiceCommandsCount }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="history"></i></div>
+            <div class="stat-label">Command History</div>
+            <div class="stat-value">{{ historyCount }}</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card chart-card">
+            <div class="card-header">
+                <h3>System Overview</h3>
+                <p>Visual comparison of your core platform modules.</p>
+            </div>
+            <canvas id="dashboardChart" height="120"></canvas>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Quick Access</h3>
+                <p>Open the main administration modules quickly.</p>
+            </div>
+
+            <div class="quick-links">
+                <a href="{{ path('admin_users') }}" class="quick-link-card">
+                    <span>Users</span>
+                    <strong>Manage user accounts</strong>
+                </a>
+
+                <a href="{{ path('admin_roles') }}" class="quick-link-card">
+                    <span>Roles</span>
+                    <strong>Manage permissions</strong>
+                </a>
+
+                <a href="{{ path('admin_managed_files') }}" class="quick-link-card">
+                    <span>Files</span>
+                    <strong>Manage system files</strong>
+                </a>
+
+                <a href="{{ path('admin_voice_commands') }}" class="quick-link-card">
+                    <span>Voice Commands</span>
+                    <strong>Manage assistant commands</strong>
+                </a>
+
+                <a href="{{ path('admin_command_history') }}" class="quick-link-card">
+                    <span>History</span>
+                    <strong>Review execution logs</strong>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const ctx = document.getElementById('dashboardChart');
+
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Users', 'Roles', 'Files', 'Voice Commands', 'History'],
+                        datasets: [{
+                            label: 'System totals',
+                            data: [
+                                {{ usersCount }},
+                                {{ rolesCount }},
+                                {{ filesCount }},
+                                {{ voiceCommandsCount }},
+                                {{ historyCount }}
+                            ],
+                            borderRadius: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            lucide.createIcons();
+        });
+    </script>
+{% endblock %}

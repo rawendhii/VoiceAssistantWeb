@@ -1,0 +1,85 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Admin - Voice Assistant{% endblock %}
+
+{% block body %}
+    <div class="admin-shell">
+        <aside class="admin-sidebar">
+            <div class="admin-brand">Assistant Vocal</div>
+            <div class="admin-subtitle">Back Office</div>
+
+            <nav class="admin-nav">
+                <a href="{{ path('admin_dashboard') }}" class="admin-link {{ app.request.attributes.get('_route') == 'admin_dashboard' ? 'active' : '' }}">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <a href="{{ path('admin_users') }}" class="admin-link {{ app.request.attributes.get('_route') starts with 'admin_users' ? 'active' : '' }}">
+                    <i data-lucide="users"></i>
+                    <span>Users</span>
+                </a>
+
+                <a href="{{ path('admin_roles') }}" class="admin-link {{ app.request.attributes.get('_route') starts with 'admin_roles' ? 'active' : '' }}">
+                    <i data-lucide="shield"></i>
+                    <span>Roles</span>
+                </a>
+
+                <a href="{{ path('admin_managed_files') }}" class="admin-link {{ app.request.attributes.get('_route') starts with 'admin_managed_files' ? 'active' : '' }}">
+                    <i data-lucide="folder"></i>
+                    <span>Managed Files</span>
+                </a>
+
+                <a href="{{ path('admin_voice_commands') }}" class="admin-link {{ app.request.attributes.get('_route') starts with 'admin_voice_commands' ? 'active' : '' }}">
+                    <i data-lucide="mic"></i>
+                    <span>Voice Commands</span>
+                </a>
+
+                <a href="{{ path('admin_command_history') }}" class="admin-link {{ app.request.attributes.get('_route') starts with 'admin_command_history' ? 'active' : '' }}">
+                    <i data-lucide="history"></i>
+                    <span>Command History</span>
+                </a>
+            </nav>
+
+            <div class="admin-sidebar-footer">
+                <a href="{{ path('app_logout') }}" class="admin-link logout-link">
+                    <i data-lucide="log-out"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <div class="admin-topbar">
+                <div class="admin-topbar-title">Administration</div>
+                <div class="admin-topbar-user">
+                    {% if app.user %}
+                        {{ app.user.fullName }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="admin-content">
+                <div id="flash-container">
+                    {% for message in app.flashes('success') %}
+                        <div class="flash flash-success">{{ message }}</div>
+                    {% endfor %}
+
+                    {% for message in app.flashes('error') %}
+                        <div class="flash flash-error">{{ message }}</div>
+                    {% endfor %}
+                </div>
+
+                {% block admin_content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            lucide.createIcons();
+        });
+    </script>
+{% endblock %}

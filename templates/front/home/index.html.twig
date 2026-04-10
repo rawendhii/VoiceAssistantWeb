@@ -1,0 +1,236 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Voice Control Home</h1>
+            <p class="page-subtitle">
+                Use the large button or press <strong>Ctrl + Space</strong> to start or stop voice listening.
+                The assistant will speak back to confirm actions.
+            </p>
+        </div>
+    </div>
+
+    <div class="voice-grid">
+        <div>
+            <div class="card">
+                <h2 style="margin-top:0;">Hands-Free Assistant</h2>
+                <p>
+                    This area is designed to help users interact with the platform using voice.
+                    Press the button once to start listening. Press it again to stop.
+                </p>
+
+                <button
+                    id="voiceToggleBtn"
+                    class="btn btn-voice"
+                    type="button"
+                    aria-pressed="false"
+                    aria-describedby="voiceHelpText"
+                >
+                    <span id="voiceToggleBtnText">Start Listening</span>
+                </button>
+
+                <p id="voiceHelpText" class="help-text">
+                    Shortcut: press Control and Space together to start or stop listening.
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="status-panel" style="margin-bottom:14px;">
+                    <div class="status-label">Listening Status</div>
+                    <div id="listeningStatus" class="status-value" aria-live="polite" aria-atomic="true">
+                        Voice assistant is idle.
+                    </div>
+                </div>
+
+                <div class="status-panel" style="margin-bottom:14px;">
+                    <div class="status-label">Recognised Speech</div>
+                    <div id="recognizedText" class="status-value" aria-live="polite" aria-atomic="true">
+                        Nothing recognised yet.
+                    </div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-label">Assistant Response</div>
+                    <div id="voiceResult" class="status-value" aria-live="assertive" aria-atomic="true">
+                        Waiting for your command.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="shortcut-box">
+                <h3>How to use it</h3>
+                <p>1. Press the large button.</p>
+                <p>2. Speak clearly and slowly.</p>
+                <p>3. Wait for the assistant to answer aloud.</p>
+                <p>4. Use the same button again to stop listening.</p>
+            </div>
+
+            <div class="card" style="margin-top:18px;">
+                <h3 style="margin-top:0;">Keyboard shortcut</h3>
+                <p>
+                    <span class="shortcut-key">Ctrl</span>
+                    <span class="shortcut-key">Space</span>
+                </p>
+                <p style="margin-bottom:0;">
+                    This shortcut starts or stops the microphone quickly for users who prefer the keyboard.
+                </p>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top:0;">Examples you can say</h3>
+                <p style="margin-bottom:8px;">“Open profile”</p>
+                <p style="margin-bottom:8px;">“Show my files”</p>
+                <p style="margin-bottom:8px;">“Go home”</p>
+                <p style="margin-bottom:0;">“Log out”</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggleBtn = document.getElementById('voiceToggleBtn');
+            const toggleBtnText = document.getElementById('voiceToggleBtnText');
+            const listeningStatus = document.getElementById('listeningStatus');
+            const recognizedText = document.getElementById('recognizedText');
+            const voiceResult = document.getElementById('voiceResult');
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            let recognition = null;
+            let isListening = false;
+            let hasSpeechSupport = !!SpeechRecognition;
+
+            function setListeningState(listening) {
+                isListening = listening;
+                toggleBtn.setAttribute('aria-pressed', listening ? 'true' : 'false');
+                toggleBtn.classList.toggle('listening', listening);
+                toggleBtnText.textContent = listening ? 'Stop Listening' : 'Start Listening';
+                listeningStatus.textContent = listening ? 'Listening now. Speak your command.' : 'Voice assistant is idle.';
+            }
+
+            function setAssistantResult(text, speak = true) {
+                voiceResult.textContent = text;
+                announceText(text);
+                if (speak) {
+                    speakText(text);
+                }
+            }
+
+            function startListening() {
+                if (!hasSpeechSupport) {
+                    setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true);
+                    return;
+                }
+
+                if (!recognition) {
+                    recognition = new SpeechRecognition();
+                    recognition.lang = 'en-US';
+                    recognition.interimResults = false;
+                    recognition.continuous = false;
+
+                    recognition.onstart = function () {
+                        setListeningState(true);
+                        setAssistantResult('I am listening. Please speak now.', true);
+                    };
+
+                    recognition.onend = function () {
+                        setListeningState(false);
+                    };
+
+                    recognition.onerror = function (event) {
+                        setListeningState(false);
+
+                        let message = 'A voice recognition error happened. Please try again.';
+                        if (event.error === 'not-allowed') {
+                            message = 'Microphone permission was denied. Please allow microphone access and try again.';
+                        } else if (event.error === 'no-speech') {
+                            message = 'I did not hear any speech. Please try again more slowly.';
+                        }
+
+                        setAssistantResult(message, true);
+                    };
+
+                    recognition.onresult = function (event) {
+                        const text = event.results[0][0].transcript.trim();
+                        recognizedText.textContent = text;
+
+                        fetch('{{ path('voice_execute') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ text: text })
+                        })
+                        .then(function (response) {
+                            return response.json();
+                        })
+                        .then(function (data) {
+                            if (!data.success) {
+                                const failMessage = data.message || 'I did not understand that command.';
+                                setAssistantResult(failMessage, true);
+                                return;
+                            }
+
+                            const spokenReply =
+                                (data.execution && data.execution.speech) ||
+                                data.message ||
+                                'Command executed successfully.';
+
+                            setAssistantResult(spokenReply, true);
+
+                            if (data.execution && data.execution.redirect) {
+                                setTimeout(function () {
+                                    window.location.href = data.execution.redirect;
+                                }, 1400);
+                            }
+                        })
+                        .catch(function () {
+                            setAssistantResult('A connection error happened while processing your command.', true);
+                        });
+                    };
+                }
+
+                recognition.start();
+            }
+
+            function stopListening() {
+                if (recognition && isListening) {
+                    recognition.stop();
+                    setAssistantResult('Listening stopped.', true);
+                }
+            }
+
+            function toggleListening() {
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+            }
+
+            toggleBtn.addEventListener('click', function () {
+                toggleListening();
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.ctrlKey && event.code === 'Space') {
+                    event.preventDefault();
+                    toggleListening();
+                }
+            });
+
+            if (!hasSpeechSupport) {
+                setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', false);
+            } else {
+                setAssistantResult('Voice assistant ready. Press the button or use Control and Space.', true);
+            }
+        });
+    </script>
+{% endblock %}
