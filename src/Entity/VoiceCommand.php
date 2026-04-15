@@ -7,6 +7,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: VoiceCommandRepository::class)]
+#[ORM\Table(name: 'voice_commands')]
 class VoiceCommand
 {
     #[ORM\Id]

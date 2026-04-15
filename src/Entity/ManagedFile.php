@@ -6,6 +6,7 @@ use App\Repository\ManagedFileRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ManagedFileRepository::class)]
+#[ORM\Table(name: 'managed_files')]
 class ManagedFile
 {
     #[ORM\Id]
