@@ -1,42 +1,44 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
+<div class="profile-wrapper">
 
-<div class="card" style="max-width:700px;margin:auto;padding:25px;border-radius:12px;">
+    
 
     <!-- Info -->
-    <div style="display:grid;gap:15px;">
-        <div>
-            <span class="text-muted">Full Name</span>
-            <div style="font-weight:600;font-size:16px;">{{ user.fullName }}</div>
-        </div>
+    <div class="card">
+        <div class="info-row">
+            <div>
+                <span>Full Name</span>
+                <strong>{{ user.fullName }}</strong>
+            </div>
 
-        <div>
-            <span class="text-muted">Email</span>
-            <div style="font-weight:600;font-size:16px;">{{ user.email }}</div>
-        </div>
+            <div>
+                <span>Email</span>
+                <strong>{{ user.email }}</strong>
+            </div>
 
-        <div>
-            <span class="text-muted">Role</span>
-            <div style="font-weight:600;font-size:16px;">{{ user.role.name }}</div>
+            <div>
+                <span>Role</span>
+                <strong class="badge">{{ user.role.name }}</strong>
+            </div>
         </div>
     </div>
-
-    <hr style="margin:25px 0;">
 
     <!-- Actions -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="{{ path('front_profile_edit') }}" class="btn btn-primary">Edit Profile</a>
-        <a href="{{ path('front_profile_change_password') }}" class="btn btn-secondary">Change Password</a>
+    <div class="card actions">
+        <a href="{{ path('front_profile_edit') }}" class="btn btn-primary">
+            Edit Profile
+        </a>
+        <a href="{{ path('front_profile_change_password') }}" class="btn btn-secondary">
+            Change Password
+        </a>
     </div>
 
-    <!-- Danger Zone -->
-    <div style="margin-top:30px;padding:15px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;">
-        <strong style="color:#dc2626;">Danger Zone</strong>
-
-        <p style="margin:10px 0;color:#7f1d1d;">
-            Deleting your account is permanent and cannot be undone.
-        </p>
+    <!-- Danger -->
+    <div class="card danger">
+        <h4>Danger Zone</h4>
+        <p>Deleting your account is permanent and cannot be undone.</p>
 
         <a href="{{ path('front_profile_delete') }}" class="btn btn-danger">
             Delete Account
