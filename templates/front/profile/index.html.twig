@@ -1,11 +1,47 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-    <h1>My Profile</h1>
 
-    <div class="card" style="max-width: 700px;">
-        <p><strong>Full Name:</strong> {{ user.fullName }}</p>
-        <p><strong>Email:</strong> {{ user.email }}</p>
-        <p><strong>Role:</strong> {{ user.role.name }}</p>
+<div class="card" style="max-width:700px;margin:auto;padding:25px;border-radius:12px;">
+
+    <!-- Info -->
+    <div style="display:grid;gap:15px;">
+        <div>
+            <span class="text-muted">Full Name</span>
+            <div style="font-weight:600;font-size:16px;">{{ user.fullName }}</div>
+        </div>
+
+        <div>
+            <span class="text-muted">Email</span>
+            <div style="font-weight:600;font-size:16px;">{{ user.email }}</div>
+        </div>
+
+        <div>
+            <span class="text-muted">Role</span>
+            <div style="font-weight:600;font-size:16px;">{{ user.role.name }}</div>
+        </div>
     </div>
+
+    <hr style="margin:25px 0;">
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="{{ path('front_profile_edit') }}" class="btn btn-primary">Edit Profile</a>
+        <a href="{{ path('front_profile_change_password') }}" class="btn btn-secondary">Change Password</a>
+    </div>
+
+    <!-- Danger Zone -->
+    <div style="margin-top:30px;padding:15px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;">
+        <strong style="color:#dc2626;">Danger Zone</strong>
+
+        <p style="margin:10px 0;color:#7f1d1d;">
+            Deleting your account is permanent and cannot be undone.
+        </p>
+
+        <a href="{{ path('front_profile_delete') }}" class="btn btn-danger">
+            Delete Account
+        </a>
+    </div>
+
+</div>
 {% endblock %}

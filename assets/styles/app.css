@@ -1,5 +1,5 @@
 body {
-    background-color: skyblue;
-    
+    background: linear-gradient(135deg, #e0f2fe, #f8fafc);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
 }
-

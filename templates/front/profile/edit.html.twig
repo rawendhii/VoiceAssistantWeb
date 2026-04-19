@@ -1,0 +1,35 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+<h2 style="margin-bottom:20px;">Edit Profile</h2>
+
+<form method="post" class="card" style="max-width:500px;margin:auto;padding:25px;border-radius:12px;"
+      onsubmit="return confirmUpdateProfile()">
+
+    <div style="margin-bottom:15px;">
+        <label>Full Name</label>
+        <input type="text" name="fullName" value="{{ user.fullName }}" required class="input">
+    </div>
+
+    <div style="margin-bottom:20px;">
+        <label>Email</label>
+        <input type="email" name="email" value="{{ user.email }}" required class="input">
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%;">Save Changes</button>
+</form>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+function confirmUpdateProfile() {
+    const ok = confirm("Are you sure you want to update your profile?");
+    if (ok) {
+        announceText("Updating your profile");
+        speakText("Updating your profile");
+    }
+    return ok;
+}
+</script>
+{% endblock %}
