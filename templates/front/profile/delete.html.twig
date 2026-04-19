@@ -1,0 +1,39 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+<div style="max-width:500px;margin:60px auto;padding:30px;background:white;border-radius:12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+
+    <h2 style="color:#dc2626;">Delete Account</h2>
+
+    <p style="margin:20px 0;color:#555;">
+        This action is <strong>permanent</strong>. All your data will be lost.
+    </p>
+
+    <form method="post" onsubmit="return confirmDeleteAccount()">
+        <input type="hidden" name="_token" value="{{ csrf_token('delete-account') }}">
+
+        <button type="submit" class="btn btn-danger" style="width:100%;">
+            Yes, Delete My Account
+        </button>
+    </form>
+
+    <a href="{{ path('front_profile') }}" style="display:block;margin-top:15px;color:#555;">
+        Cancel
+    </a>
+
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+function confirmDeleteAccount() {
+    const ok = confirm("Final confirmation: delete your account permanently?");
+    if (ok) {
+        announceText("Deleting your account");
+        speakText("Deleting your account");
+    }
+    return ok;
+}
+</script>
+{% endblock %}
