@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Create New Password{% endblock %}
+
+{% block body %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f3f4f6; padding:20px;">
+    <div style="width:100%; max-width:480px; background:white; border-radius:18px; padding:36px; box-shadow:0 12px 30px rgba(15,23,42,0.12);">
+
+        <div style="text-align:center; margin-bottom:28px;">
+            <div style="width:64px; height:64px; border-radius:50%; background:#dcfce7; color:#166534; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:22px; font-weight:800;">
+                OK
+            </div>
+
+            <h1 style="margin:0; font-size:28px; color:#111827;">Create New Password</h1>
+            <p style="margin:10px 0 0; color:#6b7280; line-height:1.6;">
+                Choose a strong password to secure your account.
+            </p>
+        </div>
+
+        {{ form_start(resetForm) }}
+
+            <div style="margin-bottom:22px;">
+                {{ form_row(resetForm.plainPassword, {
+                    label: false,
+                    attr: {
+                        style: 'width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:15px;'
+                    }
+                }) }}
+            </div>
+
+            <button type="submit"
+                    style="width:100%; padding:14px; border:none; border-radius:10px; background:#16a34a; color:white; font-size:16px; font-weight:700; cursor:pointer;">
+                Reset Password
+            </button>
+
+        {{ form_end(resetForm) }}
+
+        <div style="text-align:center; margin-top:22px;">
+            <a href="{{ path('app_login') }}" style="color:#6b7280; text-decoration:none; font-weight:600;">
+                Back to Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

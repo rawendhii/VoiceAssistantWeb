@@ -1,90 +1,723 @@
 {% extends 'admin/layout.html.twig' %}
 
 {% block admin_content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Dashboard</h1>
-            <p class="page-subtitle">
-                Welcome back. Here is a complete overview of your platform activity.
-            </p>
-        </div>
-    </div>
+    <div class="dashboard-page">
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon"><i data-lucide="users"></i></div>
-            <div class="stat-label">Total Users</div>
-            <div class="stat-value">{{ usersCount }}</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon"><i data-lucide="shield"></i></div>
-            <div class="stat-label">Total Roles</div>
-            <div class="stat-value">{{ rolesCount }}</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon"><i data-lucide="folder"></i></div>
-            <div class="stat-label">Managed Files</div>
-            <div class="stat-value">{{ filesCount }}</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon"><i data-lucide="mic"></i></div>
-            <div class="stat-label">Voice Commands</div>
-            <div class="stat-value">{{ voiceCommandsCount }}</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon"><i data-lucide="history"></i></div>
-            <div class="stat-label">Command History</div>
-            <div class="stat-value">{{ historyCount }}</div>
-        </div>
-    </div>
-
-    <div class="dashboard-grid">
-        <div class="card chart-card">
-            <div class="card-header">
-                <h3>System Overview</h3>
-                <p>Visual comparison of your core platform modules.</p>
-            </div>
-            <canvas id="dashboardChart" height="120"></canvas>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h3>Quick Access</h3>
-                <p>Open the main administration modules quickly.</p>
+        <div class="dashboard-hero">
+            <div>
+                <span class="dashboard-eyebrow">Administration Panel</span>
+                <h1>Dashboard Overview</h1>
+                <p>
+                    Monitor users, roles, managed files, voice commands, desktop actions, and command execution history from one central workspace.
+                </p>
             </div>
 
-            <div class="quick-links">
-                <a href="{{ path('admin_users') }}" class="quick-link-card">
-                    <span>Users</span>
-                    <strong>Manage user accounts</strong>
-                </a>
-
-                <a href="{{ path('admin_roles') }}" class="quick-link-card">
-                    <span>Roles</span>
-                    <strong>Manage permissions</strong>
-                </a>
-
-                <a href="{{ path('admin_managed_files') }}" class="quick-link-card">
-                    <span>Files</span>
-                    <strong>Manage system files</strong>
-                </a>
-
-                <a href="{{ path('admin_voice_commands') }}" class="quick-link-card">
-                    <span>Voice Commands</span>
-                    <strong>Manage assistant commands</strong>
-                </a>
-
-                <a href="{{ path('admin_command_history') }}" class="quick-link-card">
-                    <span>History</span>
-                    <strong>Review execution logs</strong>
-                </a>
+            <div class="dashboard-hero-card">
+                <span>Platform Status</span>
+                <strong>Operational</strong>
+                <small>Core services are available</small>
             </div>
         </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <div class="stat-icon"><i data-lucide="users"></i></div>
+                    <span class="stat-tag">Accounts</span>
+                </div>
+                <div class="stat-value">{{ usersCount }}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-top">
+                    <div class="stat-icon"><i data-lucide="shield-check"></i></div>
+                    <span class="stat-tag">Security</span>
+                </div>
+                <div class="stat-value">{{ rolesCount }}</div>
+                <div class="stat-label">Total Roles</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-top">
+                    <div class="stat-icon"><i data-lucide="folder-open"></i></div>
+                    <span class="stat-tag">Files</span>
+                </div>
+                <div class="stat-value">{{ filesCount }}</div>
+                <div class="stat-label">Managed Files</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-top">
+                    <div class="stat-icon"><i data-lucide="mic"></i></div>
+                    <span class="stat-tag">Voice</span>
+                </div>
+                <div class="stat-value">{{ voiceCommandsCount }}</div>
+                <div class="stat-label">Voice Commands</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-top">
+                    <div class="stat-icon"><i data-lucide="history"></i></div>
+                    <span class="stat-tag">Logs</span>
+                </div>
+                <div class="stat-value">{{ historyCount }}</div>
+                <div class="stat-label">Command History</div>
+            </div>
+        </div>
+
+        <div class="stats-grid audit-grid">
+            <div class="stat-card audit-card success-card">
+                <div class="stat-top">
+                    <div class="stat-icon audit-success"><i data-lucide="check-circle"></i></div>
+                    <span class="stat-tag">Success</span>
+                </div>
+                <div class="stat-value">{{ successfulCommandsCount|default(0) }}</div>
+                <div class="stat-label">Successful Commands</div>
+            </div>
+
+            <div class="stat-card audit-card failed-card">
+                <div class="stat-top">
+                    <div class="stat-icon audit-danger"><i data-lucide="x-circle"></i></div>
+                    <span class="stat-tag">Failed</span>
+                </div>
+                <div class="stat-value">{{ failedCommandsCount|default(0) }}</div>
+                <div class="stat-label">Failed Commands</div>
+            </div>
+
+            <div class="stat-card audit-card pending-card">
+                <div class="stat-top">
+                    <div class="stat-icon audit-warning"><i data-lucide="loader"></i></div>
+                    <span class="stat-tag">Pending</span>
+                </div>
+                <div class="stat-value">{{ desktopPendingCount|default(0) }}</div>
+                <div class="stat-label">Pending Desktop Actions</div>
+            </div>
+
+            <div class="stat-card audit-card failed-card">
+                <div class="stat-top">
+                    <div class="stat-icon audit-danger"><i data-lucide="alert-triangle"></i></div>
+                    <span class="stat-tag">Desktop</span>
+                </div>
+                <div class="stat-value">{{ desktopFailedCount|default(0) }}</div>
+                <div class="stat-label">Failed Desktop Actions</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card chart-card">
+                <div class="card-header-pro">
+                    <div>
+                        <h3>System Metrics</h3>
+                        <p>Comparison between the main administration modules.</p>
+                    </div>
+                    <span class="card-pill">Live totals</span>
+                </div>
+
+                <div class="chart-wrap">
+                    <canvas id="dashboardChart" height="130"></canvas>
+                </div>
+            </div>
+
+            <div class="card health-card">
+                <div class="card-header-pro">
+                    <div>
+                        <h3>System Health</h3>
+                        <p>Quick status summary of the platform.</p>
+                    </div>
+                </div>
+
+                <div class="health-list">
+                    <div class="health-item">
+                        <div>
+                            <strong>Authentication</strong>
+                            <span>Login, register, and password reset</span>
+                        </div>
+                        <em class="health-ok">Active</em>
+                    </div>
+
+                    <div class="health-item">
+                        <div>
+                            <strong>Voice Assistant</strong>
+                            <span>Speech recognition and voice feedback</span>
+                        </div>
+                        <em class="health-ok">Ready</em>
+                    </div>
+
+                    <div class="health-item">
+                        <div>
+                            <strong>File Management</strong>
+                            <span>User and admin file modules</span>
+                        </div>
+                        <em class="health-ok">Enabled</em>
+                    </div>
+
+                    <div class="health-item">
+                        <div>
+                            <strong>Command Logging</strong>
+                            <span>Executed voice commands are tracked</span>
+                        </div>
+                        <em class="health-ok">Tracked</em>
+                    </div>
+
+                    <div class="health-item">
+                        <div>
+                            <strong>Desktop Worker</strong>
+                            <span>Desktop file actions are monitored through status tracking</span>
+                        </div>
+                        <em class="health-ok">Secured</em>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card latest-card">
+            <div class="card-header-pro">
+                <div>
+                    <h3>Latest Voice Commands</h3>
+                    <p>Recent command executions for audit, debugging, and monitoring.</p>
+                </div>
+                <span class="card-pill">Audit Log</span>
+            </div>
+
+            <div class="table-wrap">
+                <table class="dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Command</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for history in latestCommands|default([]) %}
+                            <tr>
+                                <td>
+                                    {{ history.user ? history.user.email : 'Unknown user' }}
+                                </td>
+                                <td>
+                                    {{ history.command ? history.command.keyword : 'Not matched' }}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ history.status|lower|replace({'_': '-'}) }}">
+                                        {{ history.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ history.executedAt ? history.executedAt|date('Y-m-d H:i') : '-' }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="empty-row">No command history found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="dashboard-grid bottom-grid">
+            <div class="card">
+                <div class="card-header-pro">
+                    <div>
+                        <h3>Quick Access</h3>
+                        <p>Open the main administration modules quickly.</p>
+                    </div>
+                </div>
+
+                <div class="quick-links">
+                    <a href="{{ path('admin_users') }}" class="quick-link-card">
+                        <div class="quick-icon"><i data-lucide="users"></i></div>
+                        <div>
+                            <span>Users</span>
+                            <strong>Manage user accounts and account status</strong>
+                        </div>
+                    </a>
+
+                    <a href="{{ path('admin_roles') }}" class="quick-link-card">
+                        <div class="quick-icon"><i data-lucide="shield"></i></div>
+                        <div>
+                            <span>Roles</span>
+                            <strong>Control permissions and access levels</strong>
+                        </div>
+                    </a>
+
+                    <a href="{{ path('admin_managed_files') }}" class="quick-link-card">
+                        <div class="quick-icon"><i data-lucide="folder"></i></div>
+                        <div>
+                            <span>Files</span>
+                            <strong>Review and manage system files</strong>
+                        </div>
+                    </a>
+
+                    <a href="{{ path('admin_voice_commands') }}" class="quick-link-card">
+                        <div class="quick-icon"><i data-lucide="mic-2"></i></div>
+                        <div>
+                            <span>Voice Commands</span>
+                            <strong>Configure recognised assistant commands</strong>
+                        </div>
+                    </a>
+
+                    <a href="{{ path('admin_command_history') }}" class="quick-link-card">
+                        <div class="quick-icon"><i data-lucide="list-checks"></i></div>
+                        <div>
+                            <span>History</span>
+                            <strong>Review execution logs and command results</strong>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="card insight-card">
+                <div class="card-header-pro">
+                    <div>
+                        <h3>Administrative Insights</h3>
+                        <p>Useful indicators for your project demonstration.</p>
+                    </div>
+                </div>
+
+                <div class="insight-list">
+                    <div class="insight-item">
+                        <span>Total platform records</span>
+                        <strong>{{ usersCount + rolesCount + filesCount + voiceCommandsCount + historyCount }}</strong>
+                    </div>
+
+                    <div class="insight-item">
+                        <span>Voice activity volume</span>
+                        <strong>{{ historyCount }}</strong>
+                    </div>
+
+                    <div class="insight-item">
+                        <span>Configured commands</span>
+                        <strong>{{ voiceCommandsCount }}</strong>
+                    </div>
+
+                    <div class="insight-item">
+                        <span>Desktop pending actions</span>
+                        <strong>{{ desktopPendingCount|default(0) }}</strong>
+                    </div>
+
+                    <div class="insight-note">
+                        This dashboard provides a visual audit and statistics layer, which supports the advanced business logic part of the application.
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <style>
+        .dashboard-page {
+            display: grid;
+            gap: 24px;
+        }
+
+        .dashboard-hero {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            align-items: stretch;
+            padding: 30px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+            color: #ffffff;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+        }
+
+        .dashboard-eyebrow {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .dashboard-hero h1 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1.15;
+        }
+
+        .dashboard-hero p {
+            max-width: 720px;
+            margin: 12px 0 0;
+            color: rgba(255, 255, 255, 0.82);
+            line-height: 1.7;
+        }
+
+        .dashboard-hero-card {
+            min-width: 230px;
+            border-radius: 20px;
+            padding: 22px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .dashboard-hero-card span {
+            color: rgba(255, 255, 255, 0.76);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .dashboard-hero-card strong {
+            margin-top: 8px;
+            font-size: 26px;
+        }
+
+        .dashboard-hero-card small {
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .audit-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 22px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
+        }
+
+        .stat-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-icon,
+        .quick-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            background: #eef2ff;
+            color: #3730a3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .audit-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .audit-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .audit-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .stat-icon svg,
+        .quick-icon svg {
+            width: 21px;
+            height: 21px;
+        }
+
+        .stat-tag {
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .stat-value {
+            color: #111827;
+            font-size: 34px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .stat-label {
+            margin-top: 8px;
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+            gap: 22px;
+            align-items: stretch;
+        }
+
+        .bottom-grid {
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+        }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+        }
+
+        .card-header-pro {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card-header-pro h3 {
+            margin: 0;
+            color: #111827;
+            font-size: 20px;
+        }
+
+        .card-header-pro p {
+            margin: 7px 0 0;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .card-pill {
+            white-space: nowrap;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #166534;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .chart-wrap {
+            min-height: 280px;
+        }
+
+        .health-list,
+        .quick-links,
+        .insight-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .health-item,
+        .quick-link-card,
+        .insight-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #f9fafb;
+        }
+
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: center;
+            padding: 15px;
+        }
+
+        .health-item strong,
+        .quick-link-card span,
+        .insight-item span {
+            display: block;
+            color: #111827;
+            font-weight: 800;
+        }
+
+        .health-item span,
+        .quick-link-card strong {
+            display: block;
+            margin-top: 4px;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .health-ok {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #166534;
+            font-style: normal;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .quick-link-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 15px;
+            text-decoration: none;
+            transition: transform 0.16s ease, background 0.16s ease, border 0.16s ease;
+        }
+
+        .quick-link-card:hover {
+            transform: translateX(3px);
+            background: #eef6ff;
+            border-color: #bfdbfe;
+        }
+
+        .insight-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .insight-item strong {
+            color: #1d4ed8;
+            font-size: 22px;
+        }
+
+        .insight-note {
+            margin-top: 4px;
+            border-radius: 16px;
+            padding: 16px;
+            background: #eff6ff;
+            color: #1e40af;
+            line-height: 1.6;
+            font-weight: 600;
+        }
+
+        .latest-card {
+            overflow: hidden;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .dashboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .dashboard-table th {
+            padding: 14px 16px;
+            text-align: left;
+            background: #f9fafb;
+            color: #374151;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dashboard-table td {
+            padding: 15px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .dashboard-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-pending-content,
+        .status-pending-confirmation,
+        .status-pending-file-name {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-denied {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        .empty-row {
+            text-align: center;
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        @media (max-width: 1180px) {
+            .stats-grid,
+            .audit-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .dashboard-grid,
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-hero {
+                flex-direction: column;
+                padding: 24px;
+            }
+
+            .dashboard-hero-card {
+                min-width: 0;
+            }
+
+            .stats-grid,
+            .audit-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-hero h1 {
+                font-size: 28px;
+            }
+
+            .card-header-pro {
+                flex-direction: column;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block javascripts %}
@@ -99,7 +732,16 @@
                 new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: ['Users', 'Roles', 'Files', 'Voice Commands', 'History'],
+                        labels: [
+                            'Users',
+                            'Roles',
+                            'Files',
+                            'Voice Commands',
+                            'History',
+                            'Success',
+                            'Failed',
+                            'Desktop Pending'
+                        ],
                         datasets: [{
                             label: 'System totals',
                             data: [
@@ -107,23 +749,60 @@
                                 {{ rolesCount }},
                                 {{ filesCount }},
                                 {{ voiceCommandsCount }},
-                                {{ historyCount }}
+                                {{ historyCount }},
+                                {{ successfulCommandsCount|default(0) }},
+                                {{ failedCommandsCount|default(0) }},
+                                {{ desktopPendingCount|default(0) }}
                             ],
-                            borderRadius: 10
+                            borderRadius: 12,
+                            borderSkipped: false,
+                            maxBarThickness: 52
                         }]
                     },
                     options: {
                         responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
                                 display: false
+                            },
+                            tooltip: {
+                                backgroundColor: '#111827',
+                                padding: 12,
+                                titleFont: {
+                                    size: 13,
+                                    weight: 'bold'
+                                },
+                                bodyFont: {
+                                    size: 13
+                                },
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Total: ' + context.parsed.y;
+                                    }
+                                }
                             }
                         },
                         scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    color: '#6b7280',
+                                    font: {
+                                        weight: '600'
+                                    }
+                                }
+                            },
                             y: {
                                 beginAtZero: true,
+                                grid: {
+                                    color: '#e5e7eb'
+                                },
                                 ticks: {
-                                    precision: 0
+                                    precision: 0,
+                                    color: '#6b7280'
                                 }
                             }
                         }
@@ -131,7 +810,9 @@
                 });
             }
 
-            lucide.createIcons();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
         });
     </script>
 {% endblock %}

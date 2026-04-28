@@ -64,10 +64,16 @@
 
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
 
-                    <label class="auth-remember">
-                        <input type="checkbox" name="_remember_me">
-                        <span>Remember me</span>
-                    </label>
+                    <div class="auth-options">
+                        <label class="auth-remember">
+                            <input type="checkbox" name="_remember_me">
+                            <span>Remember me</span>
+                        </label>
+
+                        <a href="{{ path('app_forgot_password_request') }}" class="forgot-link">
+                            Forgot password?
+                        </a>
+                    </div>
 
                     <button type="submit" class="auth-btn">Log in</button>
                 </form>
@@ -204,11 +210,19 @@
         color: #9f9f9f;
     }
 
+    .auth-options {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 6px 0 36px;
+        flex-wrap: wrap;
+    }
+
     .auth-remember {
         display: flex;
         align-items: center;
         gap: 12px;
-        margin: 6px 0 36px;
         font-size: 16px;
         color: #111;
         cursor: pointer;
@@ -218,6 +232,17 @@
         width: 18px;
         height: 18px;
         margin: 0;
+    }
+
+    .forgot-link {
+        color: #4f8dca;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .forgot-link:hover {
+        text-decoration: underline;
     }
 
     .auth-btn {

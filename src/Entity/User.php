@@ -19,9 +19,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 180)]
     private ?string $email = null;
+    #[ORM\Column(type: 'boolean')]
+    private bool $isBlocked = false;
 
     #[ORM\Column(name: 'password_hash', length: 255)]
-private ?string $password = null; 
+    private ?string $password = null; 
     #[ORM\Column(length: 255)]
     private ?string $fullName = null;
 
@@ -61,6 +63,16 @@ private ?string $password = null;
             default => [],
         };
     }
+    public function isBlocked(): bool
+{
+    return $this->isBlocked;
+}
+
+public function setIsBlocked(bool $isBlocked): static
+{
+    $this->isBlocked = $isBlocked;
+    return $this;
+}
 
     public function getPassword(): ?string
     {

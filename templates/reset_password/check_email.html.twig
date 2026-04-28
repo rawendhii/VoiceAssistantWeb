@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Check Your Email{% endblock %}
+
+{% block body %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f3f4f6; padding:20px;">
+    <div style="width:100%; max-width:520px; background:white; border-radius:18px; padding:36px; text-align:center; box-shadow:0 12px 30px rgba(15,23,42,0.12);">
+
+        <div style="width:70px; height:70px; border-radius:50%; background:#dbeafe; color:#1d4ed8; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; font-size:22px; font-weight:800;">
+            MAIL
+        </div>
+
+        <h1 style="margin:0; font-size:28px; color:#111827;">Check Your Email</h1>
+
+        <p style="margin:16px 0 0; color:#6b7280; line-height:1.7;">
+            If an account matching your email exists, then an email was sent with a secure reset link.
+        </p>
+
+        <p style="margin:14px 0 0; color:#6b7280; line-height:1.7;">
+            This link will expire in
+            <strong>{{ resetToken.expirationMessageKey|trans(resetToken.expirationMessageData, 'ResetPasswordBundle') }}</strong>.
+        </p>
+
+        <p style="margin:14px 0 24px; color:#6b7280; line-height:1.7;">
+            If you do not receive an email, check your spam folder or try again.
+        </p>
+
+        <a href="{{ path('app_forgot_password_request') }}"
+           style="display:inline-block; padding:12px 18px; border-radius:10px; background:#2563eb; color:white; text-decoration:none; font-weight:700;">
+            Try Again
+        </a>
+
+        <div style="margin-top:18px;">
+            <a href="{{ path('app_login') }}" style="color:#6b7280; text-decoration:none; font-weight:600;">
+                Back to Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

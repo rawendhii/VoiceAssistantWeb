@@ -189,7 +189,7 @@ class UserController extends AbstractController
             return $this->redirectToRoute('admin_users_edit', ['id' => $user->getId()]);
         }
 
-        // 🔥 Prevent removing last admin
+        // Prevent removing last admin
         $oldRole = strtoupper($user->getRole()?->getName() ?? '');
         $newRole = strtoupper($role->getName());
 
@@ -252,4 +252,38 @@ class UserController extends AbstractController
         $this->addFlash('success', 'User deleted successfully.');
         return $this->redirectToRoute('admin_users');
     }
+    #[Route('/admin/users/{id}/block', name: 'admin_users_block', methods: ['POST'])]
+public function block(User $user, Request $request, EntityManagerInterface $em): Response
+{
+    if (!$this->isCsrfTokenValid('block_user_' . $user->getId(), $request->request->get('_token'))) {
+        $this->addFlash('error', 'Invalid security token.');
+        return $this->redirectToRoute('admin_users');
+    }
+
+    if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+        $this->addFlash('error', 'You cannot block an administrator.');
+        return $this->redirectToRoute('admin_users');
+    }
+
+    $user->setIsBlocked(true);
+    $em->flush();
+
+    $this->addFlash('success', 'User blocked successfully.');
+    return $this->redirectToRoute('admin_users');
+}
+
+#[Route('/admin/users/{id}/unblock', name: 'admin_users_unblock', methods: ['POST'])]
+public function unblock(User $user, Request $request, EntityManagerInterface $em): Response
+{
+    if (!$this->isCsrfTokenValid('unblock_user_' . $user->getId(), $request->request->get('_token'))) {
+        $this->addFlash('error', 'Invalid security token.');
+        return $this->redirectToRoute('admin_users');
+    }
+
+    $user->setIsBlocked(false);
+    $em->flush();
+
+    $this->addFlash('success', 'User unblocked successfully.');
+    return $this->redirectToRoute('admin_users');
+}
 }

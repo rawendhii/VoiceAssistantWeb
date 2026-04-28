@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Reset Password{% endblock %}
+
+{% block body %}
+<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f3f4f6; padding:20px;">
+    <div style="width:100%; max-width:480px; background:white; border-radius:18px; padding:36px; box-shadow:0 12px 30px rgba(15,23,42,0.12);">
+
+        <div style="text-align:center; margin-bottom:28px;">
+            <div style="width:64px; height:64px; border-radius:50%; background:#dbeafe; color:#1d4ed8; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:22px; font-weight:800;">
+                PW
+            </div>
+
+            <h1 style="margin:0; font-size:28px; color:#111827;">Forgot Password?</h1>
+            <p style="margin:10px 0 0; color:#6b7280; line-height:1.6;">
+                Enter your email address and we will send you a secure link to reset your password.
+            </p>
+        </div>
+
+        {% for flash_error in app.flashes('reset_password_error') %}
+            <div style="background:#fee2e2; color:#991b1b; padding:12px 14px; border-radius:10px; margin-bottom:18px; font-weight:600;">
+                {{ flash_error }}
+            </div>
+        {% endfor %}
+
+        {{ form_start(requestForm) }}
+
+            <div style="margin-bottom:18px;">
+                {{ form_label(requestForm.email, 'Email Address', {
+                    label_attr: {
+                        style: 'display:block; margin-bottom:8px; font-weight:700; color:#374151;'
+                    }
+                }) }}
+
+                {{ form_widget(requestForm.email, {
+                    attr: {
+                        style: 'width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:15px;',
+                        placeholder: 'example@email.com'
+                    }
+                }) }}
+
+                {{ form_errors(requestForm.email) }}
+            </div>
+
+            <button type="submit"
+                    style="width:100%; padding:14px; border:none; border-radius:10px; background:#2563eb; color:white; font-size:16px; font-weight:700; cursor:pointer;">
+                Send Reset Link
+            </button>
+
+        {{ form_end(requestForm) }}
+
+        <div style="text-align:center; margin-top:22px;">
+            <a href="{{ path('app_login') }}" style="color:#6b7280; text-decoration:none; font-weight:600;">
+                Back to Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

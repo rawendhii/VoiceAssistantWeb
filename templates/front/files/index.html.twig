@@ -1,25 +1,68 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+<div style="max-width:1200px; margin:0 auto;">
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; flex-wrap:wrap; gap:14px;">
         <div>
-            <h1 style="margin:0;">My Files</h1>
-            <p style="margin:6px 0 0; color:#6b7280;">Manage your own files.</p>
+            <h1 style="margin:0; color:#111827; font-size:32px;">My Files</h1>
+            <p style="margin:8px 0 0; color:#6b7280; line-height:1.6;">
+                Manage your files and use the voice assistant to create, rename, read, or delete files.
+            </p>
         </div>
 
-        <a href="{{ path('front_files_create') }}" class="btn">+ New File</a>
+        <a href="{{ path('front_files_create') }}" class="btn" style="padding:12px 18px; border-radius:10px; text-decoration:none;">
+            + New File
+        </a>
     </div>
 
-    <div class="card">
+    <div class="card" style="padding:22px; border-radius:18px; margin-bottom:20px; background:#eff6ff; border:1px solid #bfdbfe;">
+        <h3 style="margin:0 0 8px; color:#1e3a8a;">Desktop Executor Folder</h3>
+        <p style="margin:0; color:#1e40af; line-height:1.7;">
+            Files created by voice commands are physically created by the Java desktop executor inside:
+            <strong>C:\Users\dhraw\Desktop\VoiceAssistantFiles</strong>.
+            Keep the Java desktop application running while using voice file actions.
+        </p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+        <div class="card" style="padding:20px; border-radius:16px;">
+            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Visible Files</span>
+            <strong style="font-size:30px; color:#111827;">{{ files|length }}</strong>
+        </div>
+
+        <div class="card" style="padding:20px; border-radius:16px;">
+            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Voice Shortcut</span>
+            <strong style="font-size:22px; color:#111827;">Space</strong>
+        </div>
+
+        <div class="card" style="padding:20px; border-radius:16px;">
+            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Safe Delete</span>
+            <strong style="font-size:22px; color:#111827;">Confirmation Required</strong>
+        </div>
+    </div>
+
+    <div class="card" style="padding:24px; border-radius:18px; margin-bottom:20px;">
         <form method="get" action="{{ path('front_files') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
-            <div style="min-width:260px;">
-                <label for="search">Search</label>
-                <input id="search" type="text" name="search" value="{{ search }}" placeholder="Search by file name, path, or type">
+            <div style="min-width:280px; flex:1;">
+                <label for="search" style="display:block; margin-bottom:8px; font-weight:700; color:#374151;">Search</label>
+                <input
+                    id="search"
+                    type="text"
+                    name="search"
+                    value="{{ search }}"
+                    placeholder="Search by file name, path, or type"
+                    style="width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:12px; font-size:15px;"
+                >
             </div>
 
-            <div style="min-width:200px;">
-                <label for="type">Filter by Type</label>
-                <select id="type" name="type">
+            <div style="min-width:210px;">
+                <label for="type" style="display:block; margin-bottom:8px; font-weight:700; color:#374151;">Filter by Type</label>
+                <select
+                    id="type"
+                    name="type"
+                    style="width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:12px; font-size:15px;"
+                >
                     <option value="">All types</option>
                     <option value="PDF" {% if typeFilter == 'PDF' %}selected{% endif %}>PDF</option>
                     <option value="IMAGE" {% if typeFilter == 'IMAGE' %}selected{% endif %}>IMAGE</option>
@@ -28,64 +71,111 @@
                 </select>
             </div>
 
-            <div>
-                <button type="submit" class="btn">Search</button>
-                <a href="{{ path('front_files') }}" class="btn btn-secondary">Reset</a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="submit" class="btn" style="padding:13px 18px; border-radius:10px;">
+                    Search
+                </button>
+
+                <a href="{{ path('front_files') }}" class="btn btn-secondary" style="padding:13px 18px; border-radius:10px; text-decoration:none;">
+                    Reset
+                </a>
             </div>
         </form>
     </div>
 
-    <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:70px;">ID</th>
-                    <th>File Name</th>
-                    <th>Path</th>
-                    <th>Type</th>
-                    <th>Created At</th>
-                    <th>Updated At</th>
-                    <th style="width:220px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for file in files %}
-                <tr>
-                    <td>{{ file.id }}</td>
-                    <td>{{ file.fileName }}</td>
-                    <td>{{ file.filePath }}</td>
-                    <td>{{ file.fileType }}</td>
-                    <td>{{ file.createdAt ? file.createdAt|date('Y-m-d H:i') : '' }}</td>
-                    <td>{{ file.updatedAt ? file.updatedAt|date('Y-m-d H:i') : '' }}</td>
-                    <td>
-                        <a href="{{ path('front_files_edit', {id: file.id}) }}" class="btn">Edit</a>
-                       <form method="post" action="{{ path('front_files_delete', {id: file.id}) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this file?');">
-    <input type="hidden" name="_token" value="{{ csrf_token('delete_front_file_' ~ file.id) }}">
-    <button type="submit" class="btn btn-danger">Delete</button>
-</form>
-                    </td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="7">No files found.</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <div class="card" style="padding:24px; border-radius:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+            <div>
+                <h3 style="margin:0; color:#111827;">File List</h3>
+                <p style="margin:6px 0 0; color:#6b7280;">
+                    Files stored in the shared database and managed by the user or desktop executor.
+                </p>
+            </div>
+
+            <a href="{{ path('front_files') }}" class="btn btn-secondary" style="padding:10px 14px; border-radius:10px; text-decoration:none;">
+                Refresh
+            </a>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:70px;">ID</th>
+                        <th>File Name</th>
+                        <th>Path</th>
+                        <th>Type</th>
+                        <th>Created</th>
+                        <th>Updated</th>
+                        <th style="width:230px;">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for file in files %}
+                    <tr>
+                        <td>{{ file.id }}</td>
+
+                        <td>
+                            <strong style="color:#111827;">{{ file.fileName }}</strong>
+                        </td>
+
+                        <td style="max-width:320px; color:#4b5563; word-break:break-all;">
+                            {{ file.filePath }}
+                        </td>
+
+                        <td>
+                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:13px; font-weight:700;">
+                                {{ file.fileType }}
+                            </span>
+                        </td>
+
+                        <td>{{ file.createdAt ? file.createdAt|date('Y-m-d H:i') : '-' }}</td>
+                        <td>{{ file.updatedAt ? file.updatedAt|date('Y-m-d H:i') : '-' }}</td>
+
+                        <td>
+                            <a href="{{ path('front_files_edit', {id: file.id}) }}" class="btn" style="padding:9px 13px; border-radius:9px;">
+                                Edit
+                            </a>
+
+                            <form method="post"
+                                  action="{{ path('front_files_delete', {id: file.id}) }}"
+                                  style="display:inline-block; margin-left:8px;"
+                                  onsubmit="return confirm('Delete this file from the database? Physical files created by the desktop executor should be deleted using voice confirmation.');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_front_file_' ~ file.id) }}">
+                                <button type="submit" class="btn btn-danger" style="padding:9px 13px; border-radius:9px;">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:28px; color:#6b7280;">
+                            No files found. Press Space and say “create a file called report”.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         {% if totalPages > 1 %}
-            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+            <div style="margin-top:18px; display:flex; gap:8px; flex-wrap:wrap;">
                 {% for p in 1..totalPages %}
                     <a href="{{ path('front_files', {
                         page: p,
                         search: search,
                         type: typeFilter
                     }) }}"
-                       class="btn {{ p == page ? '' : 'btn-secondary' }}">
+                       class="btn {{ p == page ? '' : 'btn-secondary' }}"
+                       style="padding:10px 14px; border-radius:10px; text-decoration:none;">
                         {{ p }}
                     </a>
                 {% endfor %}
             </div>
         {% endif %}
     </div>
+
+</div>
 {% endblock %}

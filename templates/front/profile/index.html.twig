@@ -1,46 +1,72 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-<div class="profile-wrapper">
+<div style="max-width:980px; margin:40px auto; padding:0 16px;">
 
     
 
-    <!-- Info -->
-    <div class="card">
-        <div class="info-row">
-            <div>
-                <span>Full Name</span>
-                <strong>{{ user.fullName }}</strong>
+    <div style="background:white; border-radius:18px; padding:28px; box-shadow:0 12px 30px rgba(15,23,42,0.08); margin-bottom:22px;">
+        <div style="display:flex; align-items:center; gap:18px; margin-bottom:26px;">
+            <div style="width:68px; height:68px; border-radius:50%; background:#dbeafe; color:#1d4ed8; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:800;">
+                {{ user.fullName|slice(0, 1)|upper }}
             </div>
 
             <div>
-                <span>Email</span>
-                <strong>{{ user.email }}</strong>
+                <h2 style="margin:0; color:#111827;">{{ user.fullName }}</h2>
+                <p style="margin:6px 0 0; color:#6b7280;">{{ user.email }}</p>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+            <div style="border:1px solid #e5e7eb; border-radius:14px; padding:18px; background:#f9fafb;">
+                <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Full Name</span>
+                <strong style="color:#111827; font-size:16px;">{{ user.fullName }}</strong>
             </div>
 
-            <div>
-                <span>Role</span>
-                <strong class="badge">{{ user.role.name }}</strong>
+            <div style="border:1px solid #e5e7eb; border-radius:14px; padding:18px; background:#f9fafb;">
+                <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Email Address</span>
+                <strong style="color:#111827; font-size:16px;">{{ user.email }}</strong>
+            </div>
+
+            <div style="border:1px solid #e5e7eb; border-radius:14px; padding:18px; background:#f9fafb;">
+                <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Role</span>
+                <strong style="display:inline-block; padding:6px 12px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:14px;">
+                    {{ user.role.name }}
+                </strong>
             </div>
         </div>
     </div>
 
-    <!-- Actions -->
-    <div class="card actions">
-        <a href="{{ path('front_profile_edit') }}" class="btn btn-primary">
-            Edit Profile
-        </a>
-        <a href="{{ path('front_profile_change_password') }}" class="btn btn-secondary">
-            Change Password
-        </a>
+    <div style="background:white; border-radius:18px; padding:28px; box-shadow:0 12px 30px rgba(15,23,42,0.08); margin-bottom:22px;">
+        <h3 style="margin:0 0 8px; color:#111827;">Account Actions</h3>
+        <p style="margin:0 0 20px; color:#6b7280;">
+            Update your profile information or change your password.
+        </p>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a href="{{ path('front_profile_edit') }}"
+               class="btn btn-primary"
+               style="padding:12px 18px; border-radius:10px; text-decoration:none;">
+                Edit Profile
+            </a>
+
+            <a href="{{ path('front_profile_change_password') }}"
+               class="btn btn-secondary"
+               style="padding:12px 18px; border-radius:10px; text-decoration:none;">
+                Change Password
+            </a>
+        </div>
     </div>
 
-    <!-- Danger -->
-    <div class="card danger">
-        <h4>Danger Zone</h4>
-        <p>Deleting your account is permanent and cannot be undone.</p>
+    <div style="background:#fff7f7; border:1px solid #fecaca; border-radius:18px; padding:28px; box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+        <h3 style="margin:0 0 8px; color:#991b1b;">Danger Zone</h3>
+        <p style="margin:0 0 20px; color:#7f1d1d;">
+            Deleting your account is permanent. All related data will be removed.
+        </p>
 
-        <a href="{{ path('front_profile_delete') }}" class="btn btn-danger">
+        <a href="{{ path('front_profile_delete') }}"
+           class="btn btn-danger"
+           style="padding:12px 18px; border-radius:10px; text-decoration:none;">
             Delete Account
         </a>
     </div>

@@ -1,0 +1,33 @@
+<h2 style="font-family:Arial, sans-serif; color:#111827;">Password Reset Request</h2>
+
+<p style="font-family:Arial, sans-serif; color:#374151; line-height:1.6;">
+    Hello,
+</p>
+
+<p style="font-family:Arial, sans-serif; color:#374151; line-height:1.6;">
+    We received a request to reset the password for your Voice Assistant account.
+</p>
+
+<p style="font-family:Arial, sans-serif; color:#374151; line-height:1.6;">
+    Click the button below to create a new password:
+</p>
+
+<p>
+    <a href="{{ url('app_reset_password', {token: resetToken.token}) }}"
+       style="display:inline-block; padding:12px 18px; background:#2563eb; color:white; text-decoration:none; border-radius:8px; font-family:Arial, sans-serif; font-weight:bold;">
+        Reset My Password
+    </a>
+</p>
+
+<p style="font-family:Arial, sans-serif; color:#374151; line-height:1.6;">
+    This link will expire in
+    <strong>{{ resetToken.expirationMessageKey|trans(resetToken.expirationMessageData, 'ResetPasswordBundle') }}</strong>.
+</p>
+
+<p style="font-family:Arial, sans-serif; color:#6b7280; line-height:1.6;">
+    If you did not request this password reset, you can safely ignore this email.
+</p>
+
+<p style="font-family:Arial, sans-serif; color:#374151;">
+    Voice Assistant Support
+</p>

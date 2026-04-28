@@ -1,93 +1,330 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-    <div class="page-header">
+    <div class="voice-hero">
         <div>
-            <h1 class="page-title">Voice Control Home</h1>
-            <p class="page-subtitle">
-                Use the large button or press <strong>Ctrl + Space</strong> to start or stop voice listening.
-                The assistant will speak back to confirm actions.
+            <span class="voice-eyebrow">Accessible Voice Assistant</span>
+            <h1 class="voice-title">Control the platform with your voice</h1>
+            <p class="voice-subtitle">
+                Start the microphone with the main button or press <strong>Space</strong>.
+                Speak a supported command and the assistant will confirm the action aloud.
             </p>
         </div>
     </div>
 
     <div class="voice-grid">
-        <div>
-            <div class="card">
-                <h2 style="margin-top:0;">Hands-Free Assistant</h2>
-                <p>
-                    This area is designed to help users interact with the platform using voice.
-                    Press the button once to start listening. Press it again to stop.
-                </p>
+        <section class="voice-main-card">
+            <div class="voice-card-header">
+                <div>
+                    <h2>Voice Control Panel</h2>
+                    <p>
+                        Use voice commands to navigate quickly and reduce keyboard or mouse interaction.
+                    </p>
+                </div>
 
-                <button
-                    id="voiceToggleBtn"
-                    class="btn btn-voice"
-                    type="button"
-                    aria-pressed="false"
-                    aria-describedby="voiceHelpText"
-                >
-                    <span id="voiceToggleBtnText">Start Listening</span>
-                </button>
-
-                <p id="voiceHelpText" class="help-text">
-                    Shortcut: press Control and Space together to start or stop listening.
-                </p>
+                <div id="voiceStateBadge" class="voice-badge voice-badge-idle">
+                    Idle
+                </div>
             </div>
 
-            <div class="card">
-                <div class="status-panel" style="margin-bottom:14px;">
-                    <div class="status-label">Listening Status</div>
-                    <div id="listeningStatus" class="status-value" aria-live="polite" aria-atomic="true">
+            <button
+                id="voiceToggleBtn"
+                class="voice-button"
+                type="button"
+                aria-pressed="false"
+                aria-describedby="voiceHelpText"
+            >
+                <span id="voiceToggleBtnText">Start Listening</span>
+            </button>
+
+            <p id="voiceHelpText" class="voice-help">
+                Shortcut: press Space to start or stop listening. The shortcut is disabled while typing in a form field.
+            </p>
+
+            <div class="voice-status-grid">
+                <div class="voice-status-card">
+                    <span>Listening Status</span>
+                    <strong id="listeningStatus" aria-live="polite" aria-atomic="true">
                         Voice assistant is idle.
-                    </div>
+                    </strong>
                 </div>
 
-                <div class="status-panel" style="margin-bottom:14px;">
-                    <div class="status-label">Recognised Speech</div>
-                    <div id="recognizedText" class="status-value" aria-live="polite" aria-atomic="true">
+                <div class="voice-status-card">
+                    <span>Recognised Speech</span>
+                    <strong id="recognizedText" aria-live="polite" aria-atomic="true">
                         Nothing recognised yet.
-                    </div>
+                    </strong>
                 </div>
 
-                <div class="status-panel">
-                    <div class="status-label">Assistant Response</div>
-                    <div id="voiceResult" class="status-value" aria-live="assertive" aria-atomic="true">
+                <div class="voice-status-card voice-status-card-wide">
+                    <span>Assistant Response</span>
+                    <strong id="voiceResult" aria-live="assertive" aria-atomic="true">
                         Waiting for your command.
-                    </div>
+                    </strong>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div>
-            <div class="shortcut-box">
+        <aside class="voice-side">
+            <div class="voice-info-card">
                 <h3>How to use it</h3>
-                <p>1. Press the large button.</p>
-                <p>2. Speak clearly and slowly.</p>
-                <p>3. Wait for the assistant to answer aloud.</p>
-                <p>4. Use the same button again to stop listening.</p>
+                <ol>
+                    <li>Press the main button or press Space.</li>
+                    <li>Speak clearly after the listening message.</li>
+                    <li>Wait for the assistant response.</li>
+                    <li>Press the button or Space again to stop.</li>
+                </ol>
             </div>
 
-            <div class="card" style="margin-top:18px;">
-                <h3 style="margin-top:0;">Keyboard shortcut</h3>
+            <div class="voice-info-card">
+                <h3>Keyboard shortcut</h3>
+                <div class="shortcut-display">
+                    <span>Space</span>
+                </div>
                 <p>
-                    <span class="shortcut-key">Ctrl</span>
-                    <span class="shortcut-key">Space</span>
-                </p>
-                <p style="margin-bottom:0;">
-                    This shortcut starts or stops the microphone quickly for users who prefer the keyboard.
+                    This shortcut is easier for users with reduced mobility because it requires only one key.
                 </p>
             </div>
 
-            <div class="card">
-                <h3 style="margin-top:0;">Examples you can say</h3>
-                <p style="margin-bottom:8px;">“Open profile”</p>
-                <p style="margin-bottom:8px;">“Show my files”</p>
-                <p style="margin-bottom:8px;">“Go home”</p>
-                <p style="margin-bottom:0;">“Log out”</p>
+            <div class="voice-info-card">
+                <h3>Supported examples</h3>
+                <div class="command-list">
+                    <span>Open profile</span>
+                    <span>Show my files</span>
+                    <span>Go home</span>
+                    <span>Log out</span>
+                </div>
             </div>
-        </div>
+        </aside>
     </div>
+
+    <style>
+        .voice-hero {
+            background: linear-gradient(135deg, #eef6ff 0%, #ffffff 70%);
+            border: 1px solid #e5e7eb;
+            border-radius: 22px;
+            padding: 30px;
+            margin-bottom: 24px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .voice-eyebrow {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .voice-title {
+            margin: 0;
+            color: #111827;
+            font-size: 34px;
+            line-height: 1.15;
+        }
+
+        .voice-subtitle {
+            max-width: 760px;
+            margin: 12px 0 0;
+            color: #6b7280;
+            line-height: 1.7;
+            font-size: 16px;
+        }
+
+        .voice-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .voice-main-card,
+        .voice-info-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+        }
+
+        .voice-main-card {
+            padding: 28px;
+        }
+
+        .voice-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .voice-card-header h2,
+        .voice-info-card h3 {
+            margin: 0 0 8px;
+            color: #111827;
+        }
+
+        .voice-card-header p,
+        .voice-info-card p,
+        .voice-info-card li {
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .voice-badge {
+            min-width: 86px;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .voice-badge-idle {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .voice-badge-listening {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .voice-button {
+            width: 100%;
+            min-height: 74px;
+            border: none;
+            border-radius: 18px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.25);
+        }
+
+        .voice-button:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .voice-button.listening {
+            background: #dc2626;
+            box-shadow: 0 14px 30px rgba(220, 38, 38, 0.22);
+        }
+
+        .voice-button.listening:hover {
+            background: #b91c1c;
+        }
+
+        .voice-help {
+            margin: 14px 0 22px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .voice-status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .voice-status-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 16px;
+            background: #f9fafb;
+        }
+
+        .voice-status-card-wide {
+            grid-column: 1 / -1;
+        }
+
+        .voice-status-card span {
+            display: block;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .voice-status-card strong {
+            display: block;
+            color: #111827;
+            font-size: 15px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .voice-side {
+            display: grid;
+            gap: 18px;
+        }
+
+        .voice-info-card {
+            padding: 22px;
+        }
+
+        .voice-info-card ol {
+            margin: 10px 0 0;
+            padding-left: 22px;
+        }
+
+        .shortcut-display {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 120px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            background: #111827;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 800;
+            margin: 8px 0 12px;
+        }
+
+        .command-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .command-list span {
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 900px) {
+            .voice-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .voice-title {
+                font-size: 28px;
+            }
+
+            .voice-card-header {
+                flex-direction: column;
+            }
+
+            .voice-status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block javascripts %}
@@ -100,6 +337,7 @@
             const listeningStatus = document.getElementById('listeningStatus');
             const recognizedText = document.getElementById('recognizedText');
             const voiceResult = document.getElementById('voiceResult');
+            const voiceStateBadge = document.getElementById('voiceStateBadge');
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -107,12 +345,31 @@
             let isListening = false;
             let hasSpeechSupport = !!SpeechRecognition;
 
+            function isTypingTarget(target) {
+                if (!target) {
+                    return false;
+                }
+
+                const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+
+                return (
+                    tagName === 'input' ||
+                    tagName === 'textarea' ||
+                    tagName === 'select' ||
+                    target.isContentEditable
+                );
+            }
+
             function setListeningState(listening) {
                 isListening = listening;
                 toggleBtn.setAttribute('aria-pressed', listening ? 'true' : 'false');
                 toggleBtn.classList.toggle('listening', listening);
                 toggleBtnText.textContent = listening ? 'Stop Listening' : 'Start Listening';
                 listeningStatus.textContent = listening ? 'Listening now. Speak your command.' : 'Voice assistant is idle.';
+
+                voiceStateBadge.textContent = listening ? 'Listening' : 'Idle';
+                voiceStateBadge.classList.toggle('voice-badge-listening', listening);
+                voiceStateBadge.classList.toggle('voice-badge-idle', !listening);
             }
 
             function setAssistantResult(text, speak = true) {
@@ -122,7 +379,47 @@
                     speakText(text);
                 }
             }
+function pollDesktopActionStatus(actionId) {
+    let attempts = 0;
+    const maxAttempts = 10;
 
+    const timer = setInterval(function () {
+        attempts++;
+
+        fetch('/voice/desktop-action/' + actionId + '/status')
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                if (!data.success) {
+                    clearInterval(timer);
+                    setAssistantResult(data.message || 'Could not check the desktop action status.', true);
+                    return;
+                }
+
+                if (data.status === 'SUCCESS') {
+                    clearInterval(timer);
+                    setAssistantResult(data.resultMessage || 'Action completed successfully.', true);
+                    return;
+                }
+
+                if (data.status === 'FAILED') {
+                    clearInterval(timer);
+                    setAssistantResult(data.resultMessage || 'The desktop action failed.', true);
+                    return;
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(timer);
+                    setAssistantResult('The action is still processing. Please check again in a moment.', true);
+                }
+            })
+            .catch(function () {
+                clearInterval(timer);
+                setAssistantResult('Could not check the desktop action result.', true);
+            });
+    }, 1500);
+}
             function startListening() {
                 if (!hasSpeechSupport) {
                     setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true);
@@ -135,10 +432,11 @@
                     recognition.interimResults = false;
                     recognition.continuous = false;
 
-                    recognition.onstart = function () {
-                        setListeningState(true);
-                        setAssistantResult('I am listening. Please speak now.', true);
-                    };
+                   recognition.onstart = function () {
+    setListeningState(true);
+    voiceResult.textContent = 'Listening now. Please speak your command.';
+    announceText('Listening now. Please speak your command.');
+};
 
                     recognition.onend = function () {
                         setListeningState(false);
@@ -150,10 +448,9 @@
                         let message = 'A voice recognition error happened. Please try again.';
                         if (event.error === 'not-allowed') {
                             message = 'Microphone permission was denied. Please allow microphone access and try again.';
-                        } else if (event.error === 'no-speech') {
-                            message = 'I did not hear any speech. Please try again more slowly.';
-                        }
-
+                       } else if (event.error === 'no-speech') {
+    message = 'I did not hear anything. Press Space or Start Listening and speak your command.';
+}
                         setAssistantResult(message, true);
                     };
 
@@ -183,13 +480,17 @@
                                 data.message ||
                                 'Command executed successfully.';
 
-                            setAssistantResult(spokenReply, true);
+                           setAssistantResult(spokenReply, true);
 
-                            if (data.execution && data.execution.redirect) {
-                                setTimeout(function () {
-                                    window.location.href = data.execution.redirect;
-                                }, 1400);
-                            }
+if (data.execution && data.execution.desktopActionId) {
+    pollDesktopActionStatus(data.execution.desktopActionId);
+}
+
+if (data.execution && data.execution.redirect) {
+    setTimeout(function () {
+        window.location.href = data.execution.redirect;
+    }, 1400);
+}
                         })
                         .catch(function () {
                             setAssistantResult('A connection error happened while processing your command.', true);
@@ -197,7 +498,11 @@
                     };
                 }
 
-                recognition.start();
+                try {
+                    recognition.start();
+                } catch (error) {
+                    setAssistantResult('The microphone is already starting. Please wait a moment.', true);
+                }
             }
 
             function stopListening() {
@@ -220,7 +525,11 @@
             });
 
             document.addEventListener('keydown', function (event) {
-                if (event.ctrlKey && event.code === 'Space') {
+                if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+                    if (isTypingTarget(event.target)) {
+                        return;
+                    }
+
                     event.preventDefault();
                     toggleListening();
                 }
@@ -229,7 +538,7 @@
             if (!hasSpeechSupport) {
                 setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', false);
             } else {
-                setAssistantResult('Voice assistant ready. Press the button or use Control and Space.', true);
+                setAssistantResult('Voice assistant ready. Press the main button or press Space.', true);
             }
         });
     </script>

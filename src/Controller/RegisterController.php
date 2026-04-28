@@ -88,4 +88,4 @@ class RegisterController extends AbstractController
 
         return $this->render('security/register.html.twig');
     }
-}
+}  

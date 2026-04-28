@@ -28,7 +28,7 @@
                 </a>
 
                 <a href="{{ path('front_profile') }}"
-                   class="front-link {{ app.request.attributes.get('_route') == 'front_profile' ? 'active' : '' }}">
+                   class="front-link {{ app.request.attributes.get('_route') starts with 'front_profile' ? 'active' : '' }}">
                     <i data-lucide="user"></i>
                     <span>Profile</span>
                 </a>
@@ -69,6 +69,128 @@
             </div>
         </main>
     </div>
+
+    <div id="globalVoiceAssistant" class="global-voice-widget" aria-live="polite">
+        <div class="global-voice-info">
+            <div id="globalVoiceBadge" class="global-voice-badge">Idle</div>
+            <div>
+                <strong>Voice Assistant</strong>
+                <span id="globalVoiceText">Press Space to speak</span>
+            </div>
+        </div>
+
+        <button id="globalVoiceButton" type="button" class="global-voice-button" aria-pressed="false">
+            Start
+        </button>
+    </div>
+
+    <style>
+        .global-voice-widget {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 9999;
+            width: min(420px, calc(100vw - 48px));
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .global-voice-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .global-voice-info strong {
+            display: block;
+            color: #111827;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+
+        .global-voice-info span {
+            display: block;
+            color: #6b7280;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 240px;
+        }
+
+        .global-voice-badge {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: #f3f4f6;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .global-voice-badge.listening {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .global-voice-badge.processing {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .global-voice-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .global-voice-button {
+            border: none;
+            border-radius: 12px;
+            background: #2563eb;
+            color: #ffffff;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            min-width: 82px;
+        }
+
+        .global-voice-button:hover {
+            background: #1d4ed8;
+        }
+
+        .global-voice-button.listening {
+            background: #dc2626;
+        }
+
+        .global-voice-button.listening:hover {
+            background: #b91c1c;
+        }
+
+        @media (max-width: 720px) {
+            .global-voice-widget {
+                right: 12px;
+                bottom: 12px;
+                width: calc(100vw - 24px);
+            }
+
+            .global-voice-info span {
+                max-width: 160px;
+            }
+        }
+    </style>
 {% endblock %}
 
 {% block javascripts %}
@@ -121,7 +243,276 @@
                 }, 4000);
             }
 
-            lucide.createIcons();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+
+            const voiceButton = document.getElementById('globalVoiceButton');
+            const voiceText = document.getElementById('globalVoiceText');
+            const voiceBadge = document.getElementById('globalVoiceBadge');
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            let recognition = null;
+            let isListening = false;
+            let hasSpeechSupport = !!SpeechRecognition;
+
+            function isTypingTarget(target) {
+                if (!target) {
+                    return false;
+                }
+
+                const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+
+                return (
+                    tagName === 'input' ||
+                    tagName === 'textarea' ||
+                    tagName === 'select' ||
+                    target.isContentEditable
+                );
+            }
+
+            function setVoiceState(state, text) {
+                voiceText.textContent = text;
+
+                voiceBadge.classList.remove('listening', 'processing', 'error');
+                voiceButton.classList.remove('listening');
+
+                if (state === 'listening') {
+                    voiceBadge.textContent = 'Live';
+                    voiceBadge.classList.add('listening');
+                    voiceButton.classList.add('listening');
+                    voiceButton.textContent = 'Stop';
+                    voiceButton.setAttribute('aria-pressed', 'true');
+                    isListening = true;
+                    return;
+                }
+
+                if (state === 'processing') {
+                    voiceBadge.textContent = 'Work';
+                    voiceBadge.classList.add('processing');
+                    voiceButton.textContent = 'Start';
+                    voiceButton.setAttribute('aria-pressed', 'false');
+                    isListening = false;
+                    return;
+                }
+
+                if (state === 'error') {
+                    voiceBadge.textContent = 'Error';
+                    voiceBadge.classList.add('error');
+                    voiceButton.textContent = 'Start';
+                    voiceButton.setAttribute('aria-pressed', 'false');
+                    isListening = false;
+                    return;
+                }
+
+                voiceBadge.textContent = 'Idle';
+                voiceButton.textContent = 'Start';
+                voiceButton.setAttribute('aria-pressed', 'false');
+                isListening = false;
+            }
+
+            function setAssistantResult(text, speak = true, state = 'idle') {
+                setVoiceState(state, text);
+                announceText(text);
+
+                if (speak) {
+                    speakText(text);
+                }
+            }
+
+            function pollDesktopActionStatus(actionId) {
+                let attempts = 0;
+                const maxAttempts = 12;
+
+                setVoiceState('processing', 'Waiting for desktop execution...');
+
+                const timer = setInterval(function () {
+                    attempts++;
+
+                    fetch('/voice/desktop-action/' + actionId + '/status')
+                        .then(function (response) {
+                            return response.json();
+                        })
+                       .then(function (data) {
+console.log('DESKTOP ACTION STATUS:', data);
+   
+
+    if (!data.success) {
+                                clearInterval(timer);
+                                setAssistantResult(data.message || 'Could not check the desktop action status.', true, 'error');
+                                return;
+                            }
+
+                            if (data.status === 'SUCCESS') {
+                                clearInterval(timer);
+                                setAssistantResult(data.resultMessage || 'Action completed successfully.', true, 'idle');
+                                return;
+                            }
+
+                            if (data.status === 'FAILED') {
+                                clearInterval(timer);
+                                setAssistantResult(data.resultMessage || 'The desktop action failed.', true, 'error');
+                                return;
+                            }
+
+                            if (attempts >= maxAttempts) {
+                                clearInterval(timer);
+                                setAssistantResult('The action is still processing. Please check again in a moment.', true, 'processing');
+                            }
+                        })
+                        .catch(function () {
+                            clearInterval(timer);
+                            setAssistantResult('Could not check the desktop action result.', true, 'error');
+                        });
+                }, 1500);
+            }
+
+           function startListening() {
+    if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+    }
+
+    if (!hasSpeechSupport) {
+                    setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true, 'error');
+                    return;
+                }
+
+                if (!recognition) {
+                    recognition = new SpeechRecognition();
+                    recognition.lang = 'en-US';
+                    recognition.interimResults = false;
+                    recognition.continuous = false;
+
+                    recognition.onstart = function () {
+                        setVoiceState('listening', 'Listening now. Speak your command.');
+                        announceText('Listening now. Speak your command.');
+                    };
+
+                    recognition.onend = function () {
+                        if (isListening) {
+                            setVoiceState('idle', 'Press Space to speak');
+                        }
+                    };
+
+                   recognition.onerror = function (event) {
+    console.error('SPEECH RECOGNITION ERROR:', event.error, event);
+
+    let message = 'Voice recognition error: ' + event.error + '. Please try again.';
+
+    if (event.error === 'not-allowed') {
+        message = 'Microphone permission was denied. Please allow microphone access and try again.';
+    } else if (event.error === 'no-speech') {
+        message = 'I did not hear anything. Press Space or Start and speak your command.';
+    } else if (event.error === 'audio-capture') {
+        message = 'No microphone was found. Please check your microphone.';
+    } else if (event.error === 'network') {
+        message = 'Speech recognition network error. Please check your internet connection and try again.';
+    } else if (event.error === 'aborted') {
+        message = 'Listening was interrupted. Please press Start and try again.';
+    } else if (event.error === 'service-not-allowed') {
+        message = 'Speech recognition service is not allowed in this browser.';
+    }
+
+    setAssistantResult(message, true, 'error');
+};
+
+                    recognition.onresult = function (event) {
+                        const text = event.results[0][0].transcript.trim();
+
+                        setVoiceState('processing', 'Processing: ' + text);
+
+                        fetch('{{ path('voice_execute') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ text: text })
+                        })
+                            .then(function (response) {
+                                return response.json();
+                            })
+                           .then(function (data) {
+    console.log('VOICE EXECUTE RESPONSE:', data);
+
+    if (data.ai) {
+        console.log('AI SOURCE:', data.ai.source);
+        console.log('AI CONFIDENCE:', data.ai.confidence);
+        console.log('AI PARAMETERS:', data.ai.parameters);
+        console.log('AI RESULT:', data.ai.result);
+    }
+
+    if (!data.success) {
+        const failMessage = data.message || 'I did not understand that command.';
+        setAssistantResult(failMessage, true, 'error');
+        return;
+    }
+
+                                const spokenReply =
+                                    (data.execution && data.execution.speech) ||
+                                    data.message ||
+                                    'Command executed successfully.';
+
+                                setAssistantResult(spokenReply, true, 'idle');
+
+                                if (data.execution && data.execution.desktopActionId) {
+                                    pollDesktopActionStatus(data.execution.desktopActionId);
+                                }
+
+                                if (data.execution && data.execution.redirect) {
+                                    setTimeout(function () {
+                                        window.location.href = data.execution.redirect;
+                                    }, 1400);
+                                }
+                            })
+                            .catch(function () {
+                                setAssistantResult('A connection error happened while processing your command.', true, 'error');
+                            });
+                    };
+                }
+
+                try {
+                    recognition.start();
+                } catch (error) {
+                    setAssistantResult('The microphone is already starting. Please wait a moment.', true, 'error');
+                }
+            }
+
+            function stopListening() {
+                if (recognition && isListening) {
+                    recognition.stop();
+                    setAssistantResult('Listening stopped.', true, 'idle');
+                }
+            }
+
+            function toggleListening() {
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+            }
+
+            voiceButton.addEventListener('click', function () {
+                toggleListening();
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+                    if (isTypingTarget(event.target)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    toggleListening();
+                }
+            });
+
+            if (!hasSpeechSupport) {
+                setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', false, 'error');
+            } else {
+                setVoiceState('idle', 'Press Space to speak');
+            }
         });
     </script>
 {% endblock %}

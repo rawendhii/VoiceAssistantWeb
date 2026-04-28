@@ -75,7 +75,7 @@
                         <a href="{{ path('admin_managed_files_edit', {id: file.id}) }}" class="btn">Edit</a>
                         <form method="post" action="{{ path('admin_managed_files_delete', {id: file.id}) }}" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this file?');">
     <input type="hidden" name="_token" value="{{ csrf_token('delete_managed_file_' ~ file.id) }}">
-    <button type="submit" class="btn btn-danger">Delete</button>
+    <button type="submit" class="btn btn-danger">Remove Record</button>
 </form>
                     </td>
                 </tr>
