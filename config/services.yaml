@@ -1,6 +1,5 @@
 parameters:
     huggingface_chat_model: 'meta-llama/Llama-3.1-8B-Instruct:cerebras'
-    desktop_device_token: '%env(DESKTOP_DEVICE_TOKEN)%'
 
 services:
     _defaults:
@@ -14,11 +13,17 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    App\Service\AiCommandInterpreterService:
+    
+    App\Service\LlmCommandInterpreterService:
         arguments:
             $huggingFaceToken: '%env(HUGGINGFACE_API_TOKEN)%'
             $huggingFaceModel: '%env(default:huggingface_chat_model:HUGGINGFACE_CHAT_MODEL)%'
 
-    App\Service\DesktopActionService:
+    App\Service\InternalVoiceCommandInterpreterService:
         arguments:
-            $desktopDeviceToken: '%desktop_device_token%'
+            $huggingFaceToken: '%env(HUGGINGFACE_API_TOKEN)%'
+            $huggingFaceModel: '%env(default:huggingface_chat_model:HUGGINGFACE_CHAT_MODEL)%'
+
+    App\Service\YouTubeSearchService:
+        arguments:
+            $youtubeApiKey: '%env(YOUTUBE_API_KEY)%'

@@ -4,10 +4,10 @@
     <div class="voice-hero">
         <div>
             <span class="voice-eyebrow">Accessible Voice Assistant</span>
-            <h1 class="voice-title">Control the platform with your voice</h1>
+            <h1 class="voice-title">Control the web platform with your voice</h1>
             <p class="voice-subtitle">
-                Start the microphone with the main button or press <strong>Space</strong>.
-                Speak a supported command and the assistant will confirm the action aloud.
+                Use the microphone button or press <strong>Space</strong> to speak a web-safe command.
+                The assistant can navigate inside the platform, search supported websites, and give spoken feedback.
             </p>
         </div>
     </div>
@@ -18,7 +18,7 @@
                 <div>
                     <h2>Voice Control Panel</h2>
                     <p>
-                        Use voice commands to navigate quickly and reduce keyboard or mouse interaction.
+                        Designed for accessibility: fewer clicks, clear spoken feedback, and simple keyboard interaction.
                     </p>
                 </div>
 
@@ -67,13 +67,22 @@
 
         <aside class="voice-side">
             <div class="voice-info-card">
-                <h3>How to use it</h3>
+                <h3>How this web assistant works</h3>
                 <ol>
                     <li>Press the main button or press Space.</li>
                     <li>Speak clearly after the listening message.</li>
-                    <li>Wait for the assistant response.</li>
-                    <li>Press the button or Space again to stop.</li>
+                    <li>The assistant validates the command before executing it.</li>
+                    <li>External websites open in one reusable browser tab to avoid tab spam.</li>
+                    <li>The assistant remains active in this original tab.</li>
                 </ol>
+            </div>
+
+            <div class="voice-info-card">
+                <h3>Accessibility focus</h3>
+                <p>
+                    The web version is designed for safe web navigation and assisted browsing. It does not execute local
+                    computer actions such as creating, deleting, or modifying files.
+                </p>
             </div>
 
             <div class="voice-info-card">
@@ -82,17 +91,23 @@
                     <span>Space</span>
                 </div>
                 <p>
-                    This shortcut is easier for users with reduced mobility because it requires only one key.
+                    One large key makes the interaction easier for users with reduced hand mobility.
                 </p>
             </div>
 
             <div class="voice-info-card">
                 <h3>Supported examples</h3>
                 <div class="command-list">
+                    <span>Help</span>
+                    <span>What can I say?</span>
                     <span>Open profile</span>
                     <span>Show my files</span>
                     <span>Go home</span>
                     <span>Log out</span>
+                    <span>Open YouTube</span>
+                    <span>Search Google for Symfony</span>
+                    <span>Find music on YouTube</span>
+                    <span>Find football news on Facebook</span>
                 </div>
             </div>
         </aside>
@@ -129,7 +144,7 @@
         }
 
         .voice-subtitle {
-            max-width: 760px;
+            max-width: 780px;
             margin: 12px 0 0;
             color: #6b7280;
             line-height: 1.7;
@@ -195,9 +210,19 @@
             color: #166534;
         }
 
+        .voice-badge-processing {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .voice-badge-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .voice-button {
             width: 100%;
-            min-height: 74px;
+            min-height: 76px;
             border: none;
             border-radius: 18px;
             background: #2563eb;
@@ -344,6 +369,7 @@
             let recognition = null;
             let isListening = false;
             let hasSpeechSupport = !!SpeechRecognition;
+            let assistantWebsiteTab = null;
 
             function isTypingTarget(target) {
                 if (!target) {
@@ -360,6 +386,32 @@
                 );
             }
 
+            function isHelpCommand(text) {
+                const normalized = text.toLowerCase().trim();
+
+                return (
+                    normalized === 'help' ||
+                    normalized === 'voice help' ||
+                    normalized === 'show commands' ||
+                    normalized === 'available commands' ||
+                    normalized === 'what can i say' ||
+                    normalized === 'what can i do' ||
+                    normalized.includes('what can i say') ||
+                    normalized.includes('show me commands') ||
+                    normalized.includes('help me')
+                );
+            }
+
+            function looksLikeWebsiteCommand(text) {
+                const normalized = text.toLowerCase();
+
+                return (
+                    normalized.includes('youtube') ||
+                    normalized.includes('google') ||
+                    normalized.includes('facebook')
+                );
+            }
+
             function setListeningState(listening) {
                 isListening = listening;
                 toggleBtn.setAttribute('aria-pressed', listening ? 'true' : 'false');
@@ -368,61 +420,140 @@
                 listeningStatus.textContent = listening ? 'Listening now. Speak your command.' : 'Voice assistant is idle.';
 
                 voiceStateBadge.textContent = listening ? 'Listening' : 'Idle';
-                voiceStateBadge.classList.toggle('voice-badge-listening', listening);
-                voiceStateBadge.classList.toggle('voice-badge-idle', !listening);
+                voiceStateBadge.classList.remove('voice-badge-idle', 'voice-badge-listening', 'voice-badge-processing', 'voice-badge-error');
+                voiceStateBadge.classList.add(listening ? 'voice-badge-listening' : 'voice-badge-idle');
             }
 
-            function setAssistantResult(text, speak = true) {
-                voiceResult.textContent = text;
-                announceText(text);
+            function setAssistantStatus(message, speak = true, badgeState = 'idle') {
+                voiceResult.textContent = message;
+                announceText(message);
+
+                voiceStateBadge.classList.remove('voice-badge-idle', 'voice-badge-listening', 'voice-badge-processing', 'voice-badge-error');
+
+                if (badgeState === 'processing') {
+                    voiceStateBadge.textContent = 'Processing';
+                    voiceStateBadge.classList.add('voice-badge-processing');
+                } else if (badgeState === 'error') {
+                    voiceStateBadge.textContent = 'Error';
+                    voiceStateBadge.classList.add('voice-badge-error');
+                } else if (badgeState === 'listening') {
+                    voiceStateBadge.textContent = 'Listening';
+                    voiceStateBadge.classList.add('voice-badge-listening');
+                } else {
+                    voiceStateBadge.textContent = 'Idle';
+                    voiceStateBadge.classList.add('voice-badge-idle');
+                }
+
                 if (speak) {
-                    speakText(text);
+                    speakText(message);
                 }
             }
-function pollDesktopActionStatus(actionId) {
-    let attempts = 0;
-    const maxAttempts = 10;
+function openWebsiteInSingleTab(data) {
+    const websiteName = data.websiteName || data.website || 'the website';
 
-    const timer = setInterval(function () {
-        attempts++;
+    if ((data.website || '').toLowerCase() === 'youtube' && data.action === 'search' && data.query) {
+        window.location.href = '{{ path('front_youtube_assistant') }}?q=' + encodeURIComponent(data.query);
+        return;
+    }
 
-        fetch('/voice/desktop-action/' + actionId + '/status')
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                if (!data.success) {
-                    clearInterval(timer);
-                    setAssistantResult(data.message || 'Could not check the desktop action status.', true);
-                    return;
-                }
+    const queryText = data.query ? ' for "' + data.query + '"' : '';
+    const actionText = data.action === 'search'
+        ? 'searching ' + websiteName + queryText
+        : 'opening ' + websiteName;
 
-                if (data.status === 'SUCCESS') {
-                    clearInterval(timer);
-                    setAssistantResult(data.resultMessage || 'Action completed successfully.', true);
-                    return;
-                }
+    const message =
+        'I found a supported web command. I am ' + actionText +
+        ' in one separate browser tab. Your voice assistant will stay available here.';
 
-                if (data.status === 'FAILED') {
-                    clearInterval(timer);
-                    setAssistantResult(data.resultMessage || 'The desktop action failed.', true);
-                    return;
-                }
+    setAssistantStatus(message, true, 'idle');
 
-                if (attempts >= maxAttempts) {
-                    clearInterval(timer);
-                    setAssistantResult('The action is still processing. Please check again in a moment.', true);
-                }
-            })
-            .catch(function () {
-                clearInterval(timer);
-                setAssistantResult('Could not check the desktop action result.', true);
-            });
-    }, 1500);
+    if (assistantWebsiteTab && !assistantWebsiteTab.closed) {
+        assistantWebsiteTab.location.href = data.url;
+        assistantWebsiteTab.focus();
+        return;
+    }
+
+    assistantWebsiteTab = window.open(data.url, 'voice_assistant_external_site');
+
+    if (!assistantWebsiteTab) {
+        setAssistantStatus(
+            'The browser blocked the external tab. Please allow pop-ups for this website, then repeat your command.',
+            true,
+            'error'
+        );
+    }
 }
+                
+            function sendVoiceCommand(text) {
+               if (isHelpCommand(text)) {
+    const helpMessage =
+        'Here are some commands you can say: open profile, show my files, go home, log out, open YouTube, search Google for a topic, or find videos on YouTube. ' +
+        'This web assistant only performs safe web actions and does not modify local computer files.';
+
+    setAssistantStatus(helpMessage, true, 'idle');
+    return;
+}
+
+                const endpoint = looksLikeWebsiteCommand(text)
+                    ? '{{ path('api_voice_interpret') }}'
+                    : '{{ path('voice_execute') }}';
+
+                console.log('VOICE ENDPOINT:', endpoint);
+
+                setAssistantStatus('Processing your command: ' + text, false, 'processing');
+
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                })
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (data) {
+    console.log('VOICE RESPONSE:', data);
+
+    if (data.success && data.intent === 'WEBSITE_ACTION' && data.url) {
+        openWebsiteInSingleTab(data);
+        return;
+    }
+
+    if (!data.success) {
+        const failMessage =
+            (data.message || 'I could not match that to a supported web action.') +
+            ' You can say "what can I say" to hear available commands.';
+
+        setAssistantStatus(failMessage, true, 'error');
+        return;
+    }
+
+    const spokenReply =
+        (data.execution && data.execution.speech) ||
+        data.message ||
+        'Command completed successfully.';
+
+    setAssistantStatus(spokenReply, true, 'idle');
+
+    if (data.execution && data.execution.redirect) {
+        setTimeout(function () {
+            window.location.href = data.execution.redirect;
+        }, 1400);
+    }
+})
+                    .catch(function () {
+                        setAssistantStatus(
+                            'A connection error happened while processing your command. Please check the server and try again.',
+                            true,
+                            'error'
+                        );
+                    });
+            }
+
             function startListening() {
                 if (!hasSpeechSupport) {
-                    setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true);
+                    setAssistantStatus('Voice recognition is not supported in this browser. Please use Google Chrome.', true, 'error');
                     return;
                 }
 
@@ -432,11 +563,11 @@ function pollDesktopActionStatus(actionId) {
                     recognition.interimResults = false;
                     recognition.continuous = false;
 
-                   recognition.onstart = function () {
-    setListeningState(true);
-    voiceResult.textContent = 'Listening now. Please speak your command.';
-    announceText('Listening now. Please speak your command.');
-};
+                    recognition.onstart = function () {
+                        setListeningState(true);
+                        voiceResult.textContent = 'Listening now. Please speak your command.';
+                        announceText('Listening now. Please speak your command.');
+                    };
 
                     recognition.onend = function () {
                         setListeningState(false);
@@ -446,69 +577,39 @@ function pollDesktopActionStatus(actionId) {
                         setListeningState(false);
 
                         let message = 'A voice recognition error happened. Please try again.';
+
                         if (event.error === 'not-allowed') {
                             message = 'Microphone permission was denied. Please allow microphone access and try again.';
-                       } else if (event.error === 'no-speech') {
-    message = 'I did not hear anything. Press Space or Start Listening and speak your command.';
-}
-                        setAssistantResult(message, true);
+                        } else if (event.error === 'no-speech') {
+                            message = 'I did not hear anything. Press Space or Start Listening and speak your command.';
+                        } else if (event.error === 'audio-capture') {
+                            message = 'No microphone was found. Please check your microphone.';
+                        } else if (event.error === 'network') {
+                            message = 'Speech recognition needs a network connection. Please check your internet and try again.';
+                        }
+
+                        setAssistantStatus(message, true, 'error');
                     };
 
                     recognition.onresult = function (event) {
                         const text = event.results[0][0].transcript.trim();
                         recognizedText.textContent = text;
 
-                        fetch('{{ path('voice_execute') }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ text: text })
-                        })
-                        .then(function (response) {
-                            return response.json();
-                        })
-                        .then(function (data) {
-                            if (!data.success) {
-                                const failMessage = data.message || 'I did not understand that command.';
-                                setAssistantResult(failMessage, true);
-                                return;
-                            }
-
-                            const spokenReply =
-                                (data.execution && data.execution.speech) ||
-                                data.message ||
-                                'Command executed successfully.';
-
-                           setAssistantResult(spokenReply, true);
-
-if (data.execution && data.execution.desktopActionId) {
-    pollDesktopActionStatus(data.execution.desktopActionId);
-}
-
-if (data.execution && data.execution.redirect) {
-    setTimeout(function () {
-        window.location.href = data.execution.redirect;
-    }, 1400);
-}
-                        })
-                        .catch(function () {
-                            setAssistantResult('A connection error happened while processing your command.', true);
-                        });
+                        sendVoiceCommand(text);
                     };
                 }
 
                 try {
                     recognition.start();
                 } catch (error) {
-                    setAssistantResult('The microphone is already starting. Please wait a moment.', true);
+                    setAssistantStatus('The microphone is already starting. Please wait a moment.', true, 'error');
                 }
             }
 
             function stopListening() {
                 if (recognition && isListening) {
                     recognition.stop();
-                    setAssistantResult('Listening stopped.', true);
+                    setAssistantStatus('Listening stopped. Press Space when you want to speak again.', true, 'idle');
                 }
             }
 
@@ -536,9 +637,9 @@ if (data.execution && data.execution.redirect) {
             });
 
             if (!hasSpeechSupport) {
-                setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', false);
+                setAssistantStatus('Voice recognition is not supported in this browser. Please use Google Chrome.', false, 'error');
             } else {
-                setAssistantResult('Voice assistant ready. Press the main button or press Space.', true);
+                setAssistantStatus('Voice assistant ready. Press the main button or press Space.', true, 'idle');
             }
         });
     </script>

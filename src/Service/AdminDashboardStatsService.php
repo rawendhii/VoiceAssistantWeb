@@ -3,7 +3,6 @@
 namespace App\Service;
 
 use App\Repository\CommandHistoryRepository;
-use App\Repository\DesktopActionRepository;
 use App\Repository\ManagedFileRepository;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
@@ -16,8 +15,7 @@ class AdminDashboardStatsService
         private RoleRepository $roleRepository,
         private ManagedFileRepository $managedFileRepository,
         private VoiceCommandRepository $voiceCommandRepository,
-        private CommandHistoryRepository $commandHistoryRepository,
-        private DesktopActionRepository $desktopActionRepository
+        private CommandHistoryRepository $commandHistoryRepository
     ) {
     }
 
@@ -35,13 +33,8 @@ class AdminDashboardStatsService
             'pendingContentCount' => $this->commandHistoryRepository->countByStatus('PENDING_CONTENT'),
             'pendingConfirmationCount' => $this->commandHistoryRepository->countByStatus('PENDING_CONFIRMATION'),
 
-            'desktopPendingCount' => $this->desktopActionRepository->countByStatus('PENDING'),
-            'desktopSuccessCount' => $this->desktopActionRepository->countByStatus('SUCCESS'),
-            'desktopFailedCount' => $this->desktopActionRepository->countByStatus('FAILED'),
-
             'latestCommands' => $this->commandHistoryRepository->findLatest(5),
             'mostUsedCommands' => $this->commandHistoryRepository->findMostUsedCommands(5),
-            'latestDesktopActions' => $this->desktopActionRepository->findLatest(5),
         ];
     }
 }

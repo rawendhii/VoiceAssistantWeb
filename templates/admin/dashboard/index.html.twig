@@ -8,14 +8,14 @@
                 <span class="dashboard-eyebrow">Administration Panel</span>
                 <h1>Dashboard Overview</h1>
                 <p>
-                    Monitor users, roles, managed files, voice commands, desktop actions, and command execution history from one central workspace.
+                    Monitor users, roles, managed files, voice commands, and command execution history from one central workspace.
                 </p>
             </div>
 
             <div class="dashboard-hero-card">
                 <span>Platform Status</span>
                 <strong>Operational</strong>
-                <small>Core services are available</small>
+                <small>Core web services are available</small>
             </div>
         </div>
 
@@ -90,17 +90,17 @@
                     <div class="stat-icon audit-warning"><i data-lucide="loader"></i></div>
                     <span class="stat-tag">Pending</span>
                 </div>
-                <div class="stat-value">{{ desktopPendingCount|default(0) }}</div>
-                <div class="stat-label">Pending Desktop Actions</div>
+                <div class="stat-value">{{ pendingContentCount|default(0) }}</div>
+                <div class="stat-label">Pending Content Commands</div>
             </div>
 
-            <div class="stat-card audit-card failed-card">
+            <div class="stat-card audit-card pending-card">
                 <div class="stat-top">
-                    <div class="stat-icon audit-danger"><i data-lucide="alert-triangle"></i></div>
-                    <span class="stat-tag">Desktop</span>
+                    <div class="stat-icon audit-warning"><i data-lucide="clock"></i></div>
+                    <span class="stat-tag">Confirmation</span>
                 </div>
-                <div class="stat-value">{{ desktopFailedCount|default(0) }}</div>
-                <div class="stat-label">Failed Desktop Actions</div>
+                <div class="stat-value">{{ pendingConfirmationCount|default(0) }}</div>
+                <div class="stat-label">Pending Confirmation Commands</div>
             </div>
         </div>
 
@@ -123,7 +123,7 @@
                 <div class="card-header-pro">
                     <div>
                         <h3>System Health</h3>
-                        <p>Quick status summary of the platform.</p>
+                        <p>Quick status summary of the web platform.</p>
                     </div>
                 </div>
 
@@ -139,17 +139,25 @@
                     <div class="health-item">
                         <div>
                             <strong>Voice Assistant</strong>
-                            <span>Speech recognition and voice feedback</span>
+                            <span>Speech recognition, voice feedback, rules, and LLM fallback</span>
                         </div>
                         <em class="health-ok">Ready</em>
                     </div>
 
                     <div class="health-item">
                         <div>
-                            <strong>File Management</strong>
-                            <span>User and admin file modules</span>
+                            <strong>Website Interpreter</strong>
+                            <span>YouTube, Google, and Facebook actions are classified safely</span>
                         </div>
                         <em class="health-ok">Enabled</em>
+                    </div>
+
+                    <div class="health-item">
+                        <div>
+                            <strong>File Viewer</strong>
+                            <span>Web files are displayed in read-only mode</span>
+                        </div>
+                        <em class="health-ok">Safe</em>
                     </div>
 
                     <div class="health-item">
@@ -158,14 +166,6 @@
                             <span>Executed voice commands are tracked</span>
                         </div>
                         <em class="health-ok">Tracked</em>
-                    </div>
-
-                    <div class="health-item">
-                        <div>
-                            <strong>Desktop Worker</strong>
-                            <span>Desktop file actions are monitored through status tracking</span>
-                        </div>
-                        <em class="health-ok">Secured</em>
                     </div>
                 </div>
             </div>
@@ -248,7 +248,7 @@
                         <div class="quick-icon"><i data-lucide="folder"></i></div>
                         <div>
                             <span>Files</span>
-                            <strong>Review and manage system files</strong>
+                            <strong>Review files registered in the web application</strong>
                         </div>
                     </a>
 
@@ -295,12 +295,12 @@
                     </div>
 
                     <div class="insight-item">
-                        <span>Desktop pending actions</span>
-                        <strong>{{ desktopPendingCount|default(0) }}</strong>
+                        <span>File records</span>
+                        <strong>{{ filesCount }}</strong>
                     </div>
 
                     <div class="insight-note">
-                        This dashboard provides a visual audit and statistics layer, which supports the advanced business logic part of the application.
+                        This dashboard provides a visual audit and statistics layer for the safe web assistant. Desktop-level computer actions are intentionally separated into a future desktop module.
                     </div>
                 </div>
             </div>
@@ -739,8 +739,7 @@
                             'Voice Commands',
                             'History',
                             'Success',
-                            'Failed',
-                            'Desktop Pending'
+                            'Failed'
                         ],
                         datasets: [{
                             label: 'System totals',
@@ -751,8 +750,7 @@
                                 {{ voiceCommandsCount }},
                                 {{ historyCount }},
                                 {{ successfulCommandsCount|default(0) }},
-                                {{ failedCommandsCount|default(0) }},
-                                {{ desktopPendingCount|default(0) }}
+                                {{ failedCommandsCount|default(0) }}
                             ],
                             borderRadius: 12,
                             borderSkipped: false,

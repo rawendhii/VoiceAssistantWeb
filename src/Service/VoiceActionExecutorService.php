@@ -78,8 +78,8 @@ class VoiceActionExecutorService
             default => [
                 'success' => false,
                 'action' => 'unknown',
-                'message' => 'Command recognized, but no action is implemented for it.',
-                'speech' => 'I understood the command, but this action is not available yet.',
+                'message' => 'Command recognized, but no safe web action is implemented for it.',
+                'speech' => 'I understood the command, but this action is not available in the web assistant.',
             ],
         };
     }

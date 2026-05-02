@@ -21,6 +21,12 @@
                     <span>Voice Commands</span>
                 </a>
 
+                <a href="{{ path('front_youtube_assistant') }}"
+                   class="front-link {{ app.request.attributes.get('_route') == 'front_youtube_assistant' ? 'active' : '' }}">
+                    <i data-lucide="play-circle"></i>
+                    <span>YouTube Assistant</span>
+                </a>
+
                 <a href="{{ path('front_files') }}"
                    class="front-link {{ app.request.attributes.get('_route') starts with 'front_files' ? 'active' : '' }}">
                     <i data-lucide="folder"></i>
@@ -195,7 +201,10 @@
 
 {% block javascripts %}
     {{ parent() }}
+
     <script>
+        let globalAssistantWebsiteTab = null;
+
         function speakText(text) {
             if (!('speechSynthesis' in window) || !text) {
                 return;
@@ -208,11 +217,13 @@
             utterance.rate = 1;
             utterance.pitch = 1;
             utterance.volume = 1;
+
             window.speechSynthesis.speak(utterance);
         }
 
         function announceText(text) {
             const region = document.getElementById('globalVoiceAnnouncements');
+
             if (region) {
                 region.textContent = text;
             }
@@ -223,7 +234,12 @@
             const speakableFlashes = document.querySelectorAll('.js-speak-on-load');
 
             if (speakableFlashes.length > 0) {
-                const messages = Array.from(speakableFlashes).map(el => el.textContent.trim()).filter(Boolean);
+                const messages = Array.from(speakableFlashes)
+                    .map(function (el) {
+                        return el.textContent.trim();
+                    })
+                    .filter(Boolean);
+
                 if (messages.length > 0) {
                     setTimeout(function () {
                         speakText(messages.join('. '));
@@ -270,6 +286,85 @@
                     tagName === 'select' ||
                     target.isContentEditable
                 );
+            }
+
+            function isHelpCommand(text) {
+                const normalized = text.toLowerCase().trim();
+
+                return (
+                    normalized === 'help' ||
+                    normalized === 'voice help' ||
+                    normalized === 'show commands' ||
+                    normalized === 'available commands' ||
+                    normalized === 'what can i say' ||
+                    normalized === 'what can i do' ||
+                    normalized.includes('what can i say') ||
+                    normalized.includes('show me commands') ||
+                    normalized.includes('help me')
+                );
+            }
+
+            function looksLikeWebsiteCommand(text) {
+                const normalized = text.toLowerCase().trim();
+
+                const pageOnlyCommands = [
+                    'play',
+                    'play it',
+                    'play video',
+                    'play the video',
+                    'pause',
+                    'pause it',
+                    'pause video',
+                    'pause the video',
+                    'stop',
+                    'stop it',
+                    'stop video',
+                    'stop the video',
+                    'mute',
+                    'unmute',
+                    'volume up',
+                    'volume down',
+                    'results',
+                    'read results',
+                    'next',
+                    'previous',
+                    'open first video',
+                    'open second video',
+                    'open third video',
+                    'open this video',
+                    'open the video'
+                ];
+
+                if (pageOnlyCommands.includes(normalized)) {
+                    return false;
+                }
+
+                const hasWebsiteName =
+                    normalized.includes('youtube') ||
+                    normalized.includes('google') ||
+                    normalized.includes('facebook');
+
+                const hasWebsiteAction =
+                    normalized.includes('open') ||
+                    normalized.includes('go to') ||
+                    normalized.includes('visit') ||
+                    normalized.includes('launch') ||
+                    normalized.includes('search') ||
+                    normalized.includes('find') ||
+                    normalized.includes('look up') ||
+                    normalized.includes('look for') ||
+                    normalized.includes('google');
+
+                const impliesYoutubeSearch =
+                    normalized.includes('video') &&
+                    (
+                        normalized.includes('search') ||
+                        normalized.includes('find') ||
+                        normalized.includes('look up') ||
+                        normalized.includes('look for')
+                    );
+
+                return (hasWebsiteName && hasWebsiteAction) || impliesYoutubeSearch;
             }
 
             function setVoiceState(state, text) {
@@ -321,59 +416,131 @@
                 }
             }
 
-            function pollDesktopActionStatus(actionId) {
-                let attempts = 0;
-                const maxAttempts = 12;
+            function openWebsiteInSingleTab(data) {
+                const websiteName = data.websiteName || data.website || 'the website';
 
-                setVoiceState('processing', 'Waiting for desktop execution...');
+                if ((data.website || '').toLowerCase() === 'youtube' && data.action === 'search' && data.query) {
+                    let youtubeAssistantUrl = '{{ path('front_youtube_assistant') }}?q=' + encodeURIComponent(data.query);
 
-                const timer = setInterval(function () {
-                    attempts++;
+                    if (data.resultPosition) {
+                        youtubeAssistantUrl += '&autoplay=' + encodeURIComponent(data.resultPosition);
+                    }
 
-                    fetch('/voice/desktop-action/' + actionId + '/status')
-                        .then(function (response) {
-                            return response.json();
-                        })
-                       .then(function (data) {
-console.log('DESKTOP ACTION STATUS:', data);
-   
+                    window.location.href = youtubeAssistantUrl;
+                    return;
+                }
 
-    if (!data.success) {
-                                clearInterval(timer);
-                                setAssistantResult(data.message || 'Could not check the desktop action status.', true, 'error');
-                                return;
-                            }
+                const queryText = data.query ? ' for "' + data.query + '"' : '';
+                const actionText = data.action === 'search'
+                    ? 'searching ' + websiteName + queryText
+                    : 'opening ' + websiteName;
 
-                            if (data.status === 'SUCCESS') {
-                                clearInterval(timer);
-                                setAssistantResult(data.resultMessage || 'Action completed successfully.', true, 'idle');
-                                return;
-                            }
+                const message =
+                    'I found a supported web command. I am ' + actionText +
+                    ' in one separate browser tab. Your voice assistant will stay available here.';
 
-                            if (data.status === 'FAILED') {
-                                clearInterval(timer);
-                                setAssistantResult(data.resultMessage || 'The desktop action failed.', true, 'error');
-                                return;
-                            }
+                setAssistantResult(message, true, 'idle');
 
-                            if (attempts >= maxAttempts) {
-                                clearInterval(timer);
-                                setAssistantResult('The action is still processing. Please check again in a moment.', true, 'processing');
-                            }
-                        })
-                        .catch(function () {
-                            clearInterval(timer);
-                            setAssistantResult('Could not check the desktop action result.', true, 'error');
-                        });
-                }, 1500);
+                if (globalAssistantWebsiteTab && !globalAssistantWebsiteTab.closed) {
+                    globalAssistantWebsiteTab.location.href = data.url;
+                    globalAssistantWebsiteTab.focus();
+                    return;
+                }
+
+                globalAssistantWebsiteTab = window.open(data.url, 'voice_assistant_external_site');
+
+                if (!globalAssistantWebsiteTab) {
+                    setAssistantResult(
+                        'The browser blocked the external tab. Please allow pop-ups for this website, then repeat your command.',
+                        true,
+                        'error'
+                    );
+                }
             }
 
-           function startListening() {
-    if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-    }
+            function sendGlobalVoiceCommand(text) {
+                if (isHelpCommand(text)) {
+                    const helpMessage =
+                        'Here are some commands you can say: open profile, edit profile, change password, show my files, go home, log out, search YouTube for a topic, search Google for a topic, or find news on Facebook. ' +
+    'On the YouTube Assistant page, you can say results, next, open second video, play, pause, stop it, volume up, or volume down. ' +
+    'The web assistant can only show files stored in the web application. To create, rename, edit, delete, or manage files on your computer, use the desktop assistant module.';
+                    setAssistantResult(helpMessage, true, 'idle');
+                    return;
+                }
 
-    if (!hasSpeechSupport) {
+                if (typeof window.handlePageVoiceCommand === 'function') {
+                    const pageHandled = window.handlePageVoiceCommand(text);
+
+                    if (pageHandled === true) {
+                        return;
+                    }
+                }
+
+                const endpoint = looksLikeWebsiteCommand(text)
+                    ? '{{ path('api_voice_interpret') }}'
+                    : '{{ path('voice_execute') }}';
+
+                console.log('GLOBAL VOICE ENDPOINT:', endpoint);
+
+                setAssistantResult('Processing your command: ' + text, false, 'processing');
+
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ text: text })
+                })
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        console.log('GLOBAL VOICE RESPONSE:', data);
+
+                        if (data.success && data.intent === 'WEBSITE_ACTION' && data.url) {
+                            openWebsiteInSingleTab(data);
+                            return;
+                        }
+
+                        if (!data.success) {
+                            const failMessage =
+                                (data.message || 'I could not match that command.') +
+                                ' Try saying "what can I say" for help.';
+
+                            setAssistantResult(failMessage, true, 'error');
+                            return;
+                        }
+
+                        const spokenReply =
+                            (data.execution && data.execution.speech) ||
+                            data.speech ||
+                            data.message ||
+                            'Command completed successfully.';
+
+                        setAssistantResult(spokenReply, true, 'idle');
+
+                        if (data.execution && data.execution.redirect) {
+                            setTimeout(function () {
+                                window.location.href = data.execution.redirect;
+                            }, 1400);
+                        }
+                    })
+                    .catch(function () {
+                        setAssistantResult(
+                            'A connection error happened while processing your command. Please check the server and try again.',
+                            true,
+                            'error'
+                        );
+                    });
+            }
+
+            function startListening() {
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                }
+
+                if (!hasSpeechSupport) {
                     setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true, 'error');
                     return;
                 }
@@ -395,79 +562,34 @@ console.log('DESKTOP ACTION STATUS:', data);
                         }
                     };
 
-                   recognition.onerror = function (event) {
-    console.error('SPEECH RECOGNITION ERROR:', event.error, event);
+                    recognition.onerror = function (event) {
+                        console.error('SPEECH RECOGNITION ERROR:', event.error, event);
 
-    let message = 'Voice recognition error: ' + event.error + '. Please try again.';
+                        let message = 'Voice recognition error: ' + event.error + '. Please try again.';
 
-    if (event.error === 'not-allowed') {
-        message = 'Microphone permission was denied. Please allow microphone access and try again.';
-    } else if (event.error === 'no-speech') {
-        message = 'I did not hear anything. Press Space or Start and speak your command.';
-    } else if (event.error === 'audio-capture') {
-        message = 'No microphone was found. Please check your microphone.';
-    } else if (event.error === 'network') {
-        message = 'Speech recognition network error. Please check your internet connection and try again.';
-    } else if (event.error === 'aborted') {
-        message = 'Listening was interrupted. Please press Start and try again.';
-    } else if (event.error === 'service-not-allowed') {
-        message = 'Speech recognition service is not allowed in this browser.';
-    }
+                        if (event.error === 'not-allowed') {
+                            message = 'Microphone permission was denied. Please allow microphone access and try again.';
+                        } else if (event.error === 'no-speech') {
+                            message = 'I did not hear anything. Press Space or Start and speak your command.';
+                        } else if (event.error === 'audio-capture') {
+                            message = 'No microphone was found. Please check your microphone.';
+                        } else if (event.error === 'network') {
+                            message = 'Speech recognition needs a network connection. Please check your internet and try again.';
+                        } else if (event.error === 'aborted') {
+                            message = 'Listening was interrupted. Please press Start and try again.';
+                        } else if (event.error === 'service-not-allowed') {
+                            message = 'Speech recognition service is not allowed in this browser.';
+                        }
 
-    setAssistantResult(message, true, 'error');
-};
+                        setAssistantResult(message, true, 'error');
+                    };
 
                     recognition.onresult = function (event) {
                         const text = event.results[0][0].transcript.trim();
 
                         setVoiceState('processing', 'Processing: ' + text);
 
-                        fetch('{{ path('voice_execute') }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ text: text })
-                        })
-                            .then(function (response) {
-                                return response.json();
-                            })
-                           .then(function (data) {
-    console.log('VOICE EXECUTE RESPONSE:', data);
-
-    if (data.ai) {
-        console.log('AI SOURCE:', data.ai.source);
-        console.log('AI CONFIDENCE:', data.ai.confidence);
-        console.log('AI PARAMETERS:', data.ai.parameters);
-        console.log('AI RESULT:', data.ai.result);
-    }
-
-    if (!data.success) {
-        const failMessage = data.message || 'I did not understand that command.';
-        setAssistantResult(failMessage, true, 'error');
-        return;
-    }
-
-                                const spokenReply =
-                                    (data.execution && data.execution.speech) ||
-                                    data.message ||
-                                    'Command executed successfully.';
-
-                                setAssistantResult(spokenReply, true, 'idle');
-
-                                if (data.execution && data.execution.desktopActionId) {
-                                    pollDesktopActionStatus(data.execution.desktopActionId);
-                                }
-
-                                if (data.execution && data.execution.redirect) {
-                                    setTimeout(function () {
-                                        window.location.href = data.execution.redirect;
-                                    }, 1400);
-                                }
-                            })
-                            .catch(function () {
-                                setAssistantResult('A connection error happened while processing your command.', true, 'error');
-                            });
+                        sendGlobalVoiceCommand(text);
                     };
                 }
 
@@ -481,7 +603,7 @@ console.log('DESKTOP ACTION STATUS:', data);
             function stopListening() {
                 if (recognition && isListening) {
                     recognition.stop();
-                    setAssistantResult('Listening stopped.', true, 'idle');
+                    setAssistantResult('Listening stopped. Press Space when you want to speak again.', true, 'idle');
                 }
             }
 
