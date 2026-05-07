@@ -1,186 +1,396 @@
 {% extends 'admin/layout.html.twig' %}
 
 {% block admin_content %}
-    <div class="dashboard-page">
+    {% set totalPlatformRecords = usersCount + rolesCount + filesCount + voiceCommandsCount + historyCount %}
+    {% set successTotal = successfulCommandsCount|default(0) %}
+    {% set failedTotal = failedCommandsCount|default(0) %}
+    {% set pendingContentTotal = pendingContentCount|default(0) %}
+    {% set pendingConfirmationTotal = pendingConfirmationCount|default(0) %}
+    {% set totalCommandAudit = successTotal + failedTotal + pendingContentTotal + pendingConfirmationTotal %}
 
-        <div class="dashboard-hero">
-            <div>
-                <span class="dashboard-eyebrow">Administration Panel</span>
+    <div class="dashboard-shell">
+
+        <section class="command-center">
+            <div class="command-copy">
+                <span class="eyebrow">
+                    <i data-lucide="sparkles"></i>
+                    Intelligent Admin Workspace
+                </span>
+
                 <h1>Dashboard Overview</h1>
+
                 <p>
-                    Monitor users, roles, managed files, voice commands, and command execution history from one central workspace.
+                    Monitor accounts, roles, files, voice commands, system health, and command execution history from one clean control centre.
                 </p>
-            </div>
 
-            <div class="dashboard-hero-card">
-                <span>Platform Status</span>
-                <strong>Operational</strong>
-                <small>Core web services are available</small>
-            </div>
-        </div>
+                <div class="hero-actions">
+                    <a href="{{ path('admin_voice_commands') }}" class="hero-btn hero-btn-primary">
+                        <i data-lucide="mic-2"></i>
+                        Manage Commands
+                    </a>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-top">
-                    <div class="stat-icon"><i data-lucide="users"></i></div>
-                    <span class="stat-tag">Accounts</span>
-                </div>
-                <div class="stat-value">{{ usersCount }}</div>
-                <div class="stat-label">Total Users</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-top">
-                    <div class="stat-icon"><i data-lucide="shield-check"></i></div>
-                    <span class="stat-tag">Security</span>
-                </div>
-                <div class="stat-value">{{ rolesCount }}</div>
-                <div class="stat-label">Total Roles</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-top">
-                    <div class="stat-icon"><i data-lucide="folder-open"></i></div>
-                    <span class="stat-tag">Files</span>
-                </div>
-                <div class="stat-value">{{ filesCount }}</div>
-                <div class="stat-label">Managed Files</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-top">
-                    <div class="stat-icon"><i data-lucide="mic"></i></div>
-                    <span class="stat-tag">Voice</span>
-                </div>
-                <div class="stat-value">{{ voiceCommandsCount }}</div>
-                <div class="stat-label">Voice Commands</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-top">
-                    <div class="stat-icon"><i data-lucide="history"></i></div>
-                    <span class="stat-tag">Logs</span>
-                </div>
-                <div class="stat-value">{{ historyCount }}</div>
-                <div class="stat-label">Command History</div>
-            </div>
-        </div>
-
-        <div class="stats-grid audit-grid">
-            <div class="stat-card audit-card success-card">
-                <div class="stat-top">
-                    <div class="stat-icon audit-success"><i data-lucide="check-circle"></i></div>
-                    <span class="stat-tag">Success</span>
-                </div>
-                <div class="stat-value">{{ successfulCommandsCount|default(0) }}</div>
-                <div class="stat-label">Successful Commands</div>
-            </div>
-
-            <div class="stat-card audit-card failed-card">
-                <div class="stat-top">
-                    <div class="stat-icon audit-danger"><i data-lucide="x-circle"></i></div>
-                    <span class="stat-tag">Failed</span>
-                </div>
-                <div class="stat-value">{{ failedCommandsCount|default(0) }}</div>
-                <div class="stat-label">Failed Commands</div>
-            </div>
-
-            <div class="stat-card audit-card pending-card">
-                <div class="stat-top">
-                    <div class="stat-icon audit-warning"><i data-lucide="loader"></i></div>
-                    <span class="stat-tag">Pending</span>
-                </div>
-                <div class="stat-value">{{ pendingContentCount|default(0) }}</div>
-                <div class="stat-label">Pending Content Commands</div>
-            </div>
-
-            <div class="stat-card audit-card pending-card">
-                <div class="stat-top">
-                    <div class="stat-icon audit-warning"><i data-lucide="clock"></i></div>
-                    <span class="stat-tag">Confirmation</span>
-                </div>
-                <div class="stat-value">{{ pendingConfirmationCount|default(0) }}</div>
-                <div class="stat-label">Pending Confirmation Commands</div>
-            </div>
-        </div>
-
-        <div class="dashboard-grid">
-            <div class="card chart-card">
-                <div class="card-header-pro">
-                    <div>
-                        <h3>System Metrics</h3>
-                        <p>Comparison between the main administration modules.</p>
-                    </div>
-                    <span class="card-pill">Live totals</span>
-                </div>
-
-                <div class="chart-wrap">
-                    <canvas id="dashboardChart" height="130"></canvas>
+                    <a href="{{ path('admin_command_history') }}" class="hero-btn hero-btn-secondary">
+                        <i data-lucide="history"></i>
+                        View Audit Log
+                    </a>
                 </div>
             </div>
 
-            <div class="card health-card">
-                <div class="card-header-pro">
-                    <div>
-                        <h3>System Health</h3>
-                        <p>Quick status summary of the web platform.</p>
+            <div class="hero-orbit-card">
+                <div class="orbit-glow"></div>
+
+                <div class="platform-ring">
+                    <div class="ring-inner">
+                        <span>Platform</span>
+                        <strong>Online</strong>
                     </div>
                 </div>
 
-                <div class="health-list">
-                    <div class="health-item">
+                <div class="orbit-stat orbit-stat-one">
+                    <i data-lucide="shield-check"></i>
+                    <div>
+                        <span>Security</span>
+                        <strong>{{ rolesCount }} Roles</strong>
+                    </div>
+                </div>
+
+                <div class="orbit-stat orbit-stat-two">
+                    <i data-lucide="mic"></i>
+                    <div>
+                        <span>Voice</span>
+                        <strong>{{ voiceCommandsCount }} Rules</strong>
+                    </div>
+                </div>
+
+                <div class="orbit-stat orbit-stat-three">
+                    <i data-lucide="database"></i>
+                    <div>
+                        <span>Records</span>
+                        <strong>{{ totalPlatformRecords }}</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="metric-grid">
+            <article class="metric-card metric-purple">
+                <div class="metric-top">
+                    <div class="metric-icon">
+                        <i data-lucide="users"></i>
+                    </div>
+                    <span>Accounts</span>
+                </div>
+
+                <div class="metric-body">
+                    <strong>{{ usersCount }}</strong>
+                    <p>Total Users</p>
+                </div>
+
+                <svg class="sparkline" viewBox="0 0 220 70" preserveAspectRatio="none">
+                    <path d="M0,55 C28,20 50,62 78,34 C105,9 130,50 158,25 C184,0 196,30 220,12" />
+                </svg>
+            </article>
+
+            <article class="metric-card metric-blue">
+                <div class="metric-top">
+                    <div class="metric-icon">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                    <span>Security</span>
+                </div>
+
+                <div class="metric-body">
+                    <strong>{{ rolesCount }}</strong>
+                    <p>Total Roles</p>
+                </div>
+
+                <svg class="sparkline" viewBox="0 0 220 70" preserveAspectRatio="none">
+                    <path d="M0,48 C22,44 42,20 68,28 C96,38 110,8 140,18 C168,30 184,55 220,20" />
+                </svg>
+            </article>
+
+            <article class="metric-card metric-cyan">
+                <div class="metric-top">
+                    <div class="metric-icon">
+                        <i data-lucide="folder-open"></i>
+                    </div>
+                    <span>Files</span>
+                </div>
+
+                <div class="metric-body">
+                    <strong>{{ filesCount }}</strong>
+                    <p>Managed Files</p>
+                </div>
+
+                <svg class="sparkline" viewBox="0 0 220 70" preserveAspectRatio="none">
+                    <path d="M0,50 C30,34 48,40 70,26 C95,10 122,55 150,34 C180,12 190,18 220,8" />
+                </svg>
+            </article>
+
+            <article class="metric-card metric-pink">
+                <div class="metric-top">
+                    <div class="metric-icon">
+                        <i data-lucide="mic"></i>
+                    </div>
+                    <span>Voice</span>
+                </div>
+
+                <div class="metric-body">
+                    <strong>{{ voiceCommandsCount }}</strong>
+                    <p>Voice Commands</p>
+                </div>
+
+                <svg class="sparkline" viewBox="0 0 220 70" preserveAspectRatio="none">
+                    <path d="M0,60 C25,15 48,52 72,34 C98,16 120,45 146,30 C178,4 195,38 220,14" />
+                </svg>
+            </article>
+
+            <article class="metric-card metric-green">
+                <div class="metric-top">
+                    <div class="metric-icon">
+                        <i data-lucide="history"></i>
+                    </div>
+                    <span>Logs</span>
+                </div>
+
+                <div class="metric-body">
+                    <strong>{{ historyCount }}</strong>
+                    <p>Command History</p>
+                </div>
+
+                <svg class="sparkline" viewBox="0 0 220 70" preserveAspectRatio="none">
+                    <path d="M0,54 C28,48 42,22 68,36 C92,50 120,8 150,18 C178,26 190,60 220,20" />
+                </svg>
+            </article>
+        </section>
+
+        <section class="insight-grid">
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Live Totals</span>
+                        <h2>System Metrics</h2>
+                        <p>Visual comparison between your core administration modules.</p>
+                    </div>
+
+                    <div class="panel-menu">
+                        <i data-lucide="bar-chart-3"></i>
+                    </div>
+                </div>
+
+                <div class="chart-box">
+                    <canvas id="dashboardChart"></canvas>
+                </div>
+            </article>
+
+            <article class="panel audit-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Command Quality</span>
+                        <h2>Execution Health</h2>
+                        <p>Success, failed, and pending command status summary.</p>
+                    </div>
+
+                    <div class="panel-menu">
+                        <i data-lucide="activity"></i>
+                    </div>
+                </div>
+
+                <div class="donut-layout">
+                    <div class="donut-box">
+                        <canvas id="commandDonut"></canvas>
+                        <div class="donut-center">
+                            <span>Total</span>
+                            <strong>{{ totalCommandAudit }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="audit-list">
+                        <div class="audit-row">
+                            <span class="dot dot-green"></span>
+                            <div>
+                                <strong>{{ successTotal }}</strong>
+                                <p>Successful Commands</p>
+                            </div>
+                        </div>
+
+                        <div class="audit-row">
+                            <span class="dot dot-red"></span>
+                            <div>
+                                <strong>{{ failedTotal }}</strong>
+                                <p>Failed Commands</p>
+                            </div>
+                        </div>
+
+                        <div class="audit-row">
+                            <span class="dot dot-yellow"></span>
+                            <div>
+                                <strong>{{ pendingContentTotal }}</strong>
+                                <p>Pending Content</p>
+                            </div>
+                        </div>
+
+                        <div class="audit-row">
+                            <span class="dot dot-purple"></span>
+                            <div>
+                                <strong>{{ pendingConfirmationTotal }}</strong>
+                                <p>Pending Confirmation</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="operations-grid">
+            <article class="panel health-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">System Status</span>
+                        <h2>Platform Health</h2>
+                        <p>Quick operational overview of your assistant infrastructure.</p>
+                    </div>
+
+                    <span class="live-badge">
+                        <span></span>
+                        Operational
+                    </span>
+                </div>
+
+                <div class="health-timeline">
+                    <div class="health-step">
+                        <div class="health-marker">
+                            <i data-lucide="lock"></i>
+                        </div>
+
                         <div>
                             <strong>Authentication</strong>
-                            <span>Login, register, and password reset</span>
+                            <p>Login, registration, and password reset modules are available.</p>
                         </div>
-                        <em class="health-ok">Active</em>
+
+                        <em>Active</em>
                     </div>
 
-                    <div class="health-item">
+                    <div class="health-step">
+                        <div class="health-marker">
+                            <i data-lucide="audio-lines"></i>
+                        </div>
+
                         <div>
                             <strong>Voice Assistant</strong>
-                            <span>Speech recognition, voice feedback, rules, and LLM fallback</span>
+                            <p>Speech recognition, voice feedback, rules, and LLM fallback are ready.</p>
                         </div>
-                        <em class="health-ok">Ready</em>
+
+                        <em>Ready</em>
                     </div>
 
-                    <div class="health-item">
+                    <div class="health-step">
+                        <div class="health-marker">
+                            <i data-lucide="globe-2"></i>
+                        </div>
+
                         <div>
                             <strong>Website Interpreter</strong>
-                            <span>YouTube, Google, and Facebook actions are classified safely</span>
+                            <p>YouTube, Google, and Facebook actions are classified safely.</p>
                         </div>
-                        <em class="health-ok">Enabled</em>
+
+                        <em>Enabled</em>
                     </div>
 
-                    <div class="health-item">
+                    <div class="health-step">
+                        <div class="health-marker">
+                            <i data-lucide="file-search"></i>
+                        </div>
+
                         <div>
                             <strong>File Viewer</strong>
-                            <span>Web files are displayed in read-only mode</span>
+                            <p>Web files are displayed in a protected read-only mode.</p>
                         </div>
-                        <em class="health-ok">Safe</em>
+
+                        <em>Safe</em>
                     </div>
 
-                    <div class="health-item">
+                    <div class="health-step">
+                        <div class="health-marker">
+                            <i data-lucide="scroll-text"></i>
+                        </div>
+
                         <div>
                             <strong>Command Logging</strong>
-                            <span>Executed voice commands are tracked</span>
+                            <p>Executed voice commands are tracked for debugging and audit review.</p>
                         </div>
-                        <em class="health-ok">Tracked</em>
+
+                        <em>Tracked</em>
                     </div>
                 </div>
-            </div>
-        </div>
+            </article>
 
-        <div class="card latest-card">
-            <div class="card-header-pro">
-                <div>
-                    <h3>Latest Voice Commands</h3>
-                    <p>Recent command executions for audit, debugging, and monitoring.</p>
+            <article class="panel quick-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-kicker">Navigation</span>
+                        <h2>Quick Access</h2>
+                        <p>Jump directly into the main administration modules.</p>
+                    </div>
                 </div>
-                <span class="card-pill">Audit Log</span>
+
+                <div class="quick-grid">
+                    <a href="{{ path('admin_users') }}" class="quick-tile">
+                        <i data-lucide="users"></i>
+                        <span>Users</span>
+                        <small>Manage accounts</small>
+                    </a>
+
+                    <a href="{{ path('admin_roles') }}" class="quick-tile">
+                        <i data-lucide="shield"></i>
+                        <span>Roles</span>
+                        <small>Control access</small>
+                    </a>
+
+                    <a href="{{ path('admin_managed_files') }}" class="quick-tile">
+                        <i data-lucide="folder"></i>
+                        <span>Files</span>
+                        <small>Review records</small>
+                    </a>
+
+                    <a href="{{ path('admin_voice_commands') }}" class="quick-tile">
+                        <i data-lucide="mic-2"></i>
+                        <span>Commands</span>
+                        <small>Configure rules</small>
+                    </a>
+
+                    <a href="{{ path('admin_command_history') }}" class="quick-tile quick-wide">
+                        <i data-lucide="list-checks"></i>
+                        <span>History</span>
+                        <small>Audit execution logs</small>
+                    </a>
+                </div>
+
+                <div class="summary-card">
+                    <span>Total Platform Records</span>
+                    <strong>{{ totalPlatformRecords }}</strong>
+                    <p>
+                        Combined users, roles, managed files, commands, and command history entries.
+                    </p>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel latest-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="panel-kicker">Audit Log</span>
+                    <h2>Latest Voice Commands</h2>
+                    <p>Recent command executions for monitoring, debugging, and safety review.</p>
+                </div>
+
+                <a href="{{ path('admin_command_history') }}" class="small-link">
+                    View all
+                    <i data-lucide="arrow-up-right"></i>
+                </a>
             </div>
 
-            <div class="table-wrap">
+            <div class="table-frame">
                 <table class="dashboard-table">
                     <thead>
                         <tr>
@@ -190,546 +400,1051 @@
                             <th>Date</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         {% for history in latestCommands|default([]) %}
                             <tr>
                                 <td>
-                                    {{ history.user ? history.user.email : 'Unknown user' }}
+                                    <div class="user-cell">
+                                        <span>{{ history.user ? history.user.email|first|upper : '?' }}</span>
+                                        <strong>{{ history.user ? history.user.email : 'Unknown user' }}</strong>
+                                    </div>
                                 </td>
+
                                 <td>
                                     {{ history.command ? history.command.keyword : 'Not matched' }}
                                 </td>
+
                                 <td>
                                     <span class="status-badge status-{{ history.status|lower|replace({'_': '-'}) }}">
                                         {{ history.status }}
                                     </span>
                                 </td>
+
                                 <td>
                                     {{ history.executedAt ? history.executedAt|date('Y-m-d H:i') : '-' }}
                                 </td>
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="4" class="empty-row">No command history found.</td>
+                                <td colspan="4" class="empty-row">
+                                    No command history found.
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div class="dashboard-grid bottom-grid">
-            <div class="card">
-                <div class="card-header-pro">
-                    <div>
-                        <h3>Quick Access</h3>
-                        <p>Open the main administration modules quickly.</p>
-                    </div>
-                </div>
-
-                <div class="quick-links">
-                    <a href="{{ path('admin_users') }}" class="quick-link-card">
-                        <div class="quick-icon"><i data-lucide="users"></i></div>
-                        <div>
-                            <span>Users</span>
-                            <strong>Manage user accounts and account status</strong>
-                        </div>
-                    </a>
-
-                    <a href="{{ path('admin_roles') }}" class="quick-link-card">
-                        <div class="quick-icon"><i data-lucide="shield"></i></div>
-                        <div>
-                            <span>Roles</span>
-                            <strong>Control permissions and access levels</strong>
-                        </div>
-                    </a>
-
-                    <a href="{{ path('admin_managed_files') }}" class="quick-link-card">
-                        <div class="quick-icon"><i data-lucide="folder"></i></div>
-                        <div>
-                            <span>Files</span>
-                            <strong>Review files registered in the web application</strong>
-                        </div>
-                    </a>
-
-                    <a href="{{ path('admin_voice_commands') }}" class="quick-link-card">
-                        <div class="quick-icon"><i data-lucide="mic-2"></i></div>
-                        <div>
-                            <span>Voice Commands</span>
-                            <strong>Configure recognised assistant commands</strong>
-                        </div>
-                    </a>
-
-                    <a href="{{ path('admin_command_history') }}" class="quick-link-card">
-                        <div class="quick-icon"><i data-lucide="list-checks"></i></div>
-                        <div>
-                            <span>History</span>
-                            <strong>Review execution logs and command results</strong>
-                        </div>
-                    </a>
-                </div>
-            </div>
-
-            <div class="card insight-card">
-                <div class="card-header-pro">
-                    <div>
-                        <h3>Administrative Insights</h3>
-                        <p>Useful indicators for your project demonstration.</p>
-                    </div>
-                </div>
-
-                <div class="insight-list">
-                    <div class="insight-item">
-                        <span>Total platform records</span>
-                        <strong>{{ usersCount + rolesCount + filesCount + voiceCommandsCount + historyCount }}</strong>
-                    </div>
-
-                    <div class="insight-item">
-                        <span>Voice activity volume</span>
-                        <strong>{{ historyCount }}</strong>
-                    </div>
-
-                    <div class="insight-item">
-                        <span>Configured commands</span>
-                        <strong>{{ voiceCommandsCount }}</strong>
-                    </div>
-
-                    <div class="insight-item">
-                        <span>File records</span>
-                        <strong>{{ filesCount }}</strong>
-                    </div>
-
-                    <div class="insight-note">
-                        This dashboard provides a visual audit and statistics layer for the safe web assistant. Desktop-level computer actions are intentionally separated into a future desktop module.
-                    </div>
-                </div>
-            </div>
-        </div>
+        </section>
 
     </div>
 
-    <style>
-        .dashboard-page {
-            display: grid;
-            gap: 24px;
+   <style>
+    :root {
+        --dash-bg: #f8fafc;
+        --dash-surface: #ffffff;
+        --dash-soft: #f1f5f9;
+        --dash-border: #e2e8f0;
+        --dash-text: #0f172a;
+        --dash-muted: #64748b;
+        --dash-blue: #2563eb;
+        --dash-blue-dark: #1d4ed8;
+        --dash-cyan: #38bdf8;
+        --dash-purple: #7c3aed;
+        --dash-pink: #db2777;
+        --dash-green: #16a34a;
+        --dash-red: #dc2626;
+        --dash-yellow: #d97706;
+        --dash-radius-xl: 30px;
+        --dash-radius-lg: 24px;
+        --dash-radius-md: 18px;
+        --dash-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    .dashboard-shell,
+    .dashboard-shell * {
+        box-sizing: border-box;
+    }
+
+    .dashboard-shell {
+        display: grid;
+        gap: 24px;
+        color: var(--dash-text);
+    }
+
+    .command-center {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+        gap: 26px;
+        min-height: 320px;
+        padding: 34px;
+        border-radius: var(--dash-radius-xl);
+        background:
+            radial-gradient(circle at 78% 25%, rgba(37, 99, 235, 0.22), transparent 34%),
+            linear-gradient(135deg, #071126 0%, #111827 52%, #172554 100%);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+    }
+
+    .command-center::before {
+        content: "";
+        position: absolute;
+        inset: -45%;
+        background:
+            conic-gradient(
+                from 0deg,
+                transparent,
+                rgba(59, 130, 246, 0.22),
+                transparent,
+                rgba(56, 189, 248, 0.16),
+                transparent,
+                rgba(96, 165, 250, 0.18),
+                transparent
+            );
+        filter: blur(80px);
+        opacity: 0.72;
+        animation: dashAurora 18s linear infinite;
+    }
+
+    .command-center::after {
+        content: "";
+        position: absolute;
+        left: 34px;
+        right: 34px;
+        bottom: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(147, 197, 253, 0.9), rgba(56, 189, 248, 0.75), transparent);
+    }
+
+    .command-copy,
+    .hero-orbit-card {
+        position: relative;
+        z-index: 1;
+    }
+
+    .eyebrow,
+    .panel-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: max-content;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 950;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #bfdbfe;
+        background: rgba(37, 99, 235, 0.18);
+        border: 1px solid rgba(147, 197, 253, 0.24);
+    }
+
+    .eyebrow svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .command-copy h1 {
+        max-width: 760px;
+        margin: 18px 0 0;
+        font-size: clamp(38px, 5vw, 70px);
+        line-height: 0.95;
+        letter-spacing: -0.07em;
+        color: #ffffff;
+        font-weight: 950;
+    }
+
+    .command-copy p {
+        max-width: 760px;
+        margin: 20px 0 0;
+        color: #cbd5e1;
+        font-size: 17px;
+        line-height: 1.7;
+        font-weight: 650;
+    }
+
+    .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+    }
+
+    .hero-btn {
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 0 18px;
+        border-radius: 16px;
+        text-decoration: none;
+        font-size: 15px;
+        font-weight: 900;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .hero-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .hero-btn-primary {
+        color: #ffffff;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        box-shadow: 0 18px 38px rgba(37, 99, 235, 0.34);
+    }
+
+    .hero-btn-secondary {
+        color: #dbeafe;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(226, 232, 240, 0.16);
+    }
+
+    .hero-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .hero-orbit-card {
+        min-height: 250px;
+        border-radius: 28px;
+        background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+            rgba(15, 23, 42, 0.42);
+        border: 1px solid rgba(226, 232, 240, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+    }
+
+    .orbit-glow {
+        position: absolute;
+        inset: 20px;
+        border-radius: 999px;
+        background:
+            radial-gradient(circle, rgba(59, 130, 246, 0.24), transparent 55%),
+            conic-gradient(from 180deg, rgba(37, 99, 235, 0.45), rgba(56, 189, 248, 0.36), rgba(37, 99, 235, 0.45));
+        filter: blur(10px);
+        opacity: 0.8;
+    }
+
+    .platform-ring {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 170px;
+        height: 170px;
+        transform: translate(-50%, -50%);
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background:
+            conic-gradient(from 220deg, #2563eb, #60a5fa, #38bdf8, #2563eb);
+        box-shadow: 0 0 70px rgba(59, 130, 246, 0.30);
+    }
+
+    .platform-ring::before {
+        content: "";
+        position: absolute;
+        inset: 11px;
+        border-radius: inherit;
+        background: #08111f;
+    }
+
+    .ring-inner {
+        position: relative;
+        z-index: 1;
+        width: 122px;
+        height: 122px;
+        border-radius: inherit;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.92));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ring-inner span {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .ring-inner strong {
+        margin-top: 4px;
+        font-size: 23px;
+        letter-spacing: -0.04em;
+        color: #ffffff;
+    }
+
+    .orbit-stat {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 148px;
+        padding: 12px;
+        border-radius: 18px;
+        background: rgba(2, 6, 23, 0.52);
+        border: 1px solid rgba(226, 232, 240, 0.14);
+        backdrop-filter: blur(14px);
+    }
+
+    .orbit-stat svg {
+        width: 18px;
+        height: 18px;
+        color: #7dd3fc;
+    }
+
+    .orbit-stat span {
+        display: block;
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 750;
+    }
+
+    .orbit-stat strong {
+        display: block;
+        margin-top: 3px;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 900;
+    }
+
+    .orbit-stat-one {
+        left: 22px;
+        top: 24px;
+    }
+
+    .orbit-stat-two {
+        right: 20px;
+        top: 94px;
+    }
+
+    .orbit-stat-three {
+        left: 34px;
+        bottom: 24px;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .metric-card {
+        position: relative;
+        overflow: hidden;
+        min-height: 176px;
+        padding: 22px;
+        border-radius: var(--dash-radius-lg);
+        border: 1px solid var(--dash-border);
+        background: #ffffff;
+        box-shadow: var(--dash-shadow);
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .metric-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.78;
+        background: radial-gradient(circle at top right, var(--card-glow), transparent 44%);
+        pointer-events: none;
+    }
+
+    .metric-purple {
+        --card-glow: rgba(124, 58, 237, 0.14);
+        --accent: #7c3aed;
+    }
+
+    .metric-blue {
+        --card-glow: rgba(37, 99, 235, 0.14);
+        --accent: #2563eb;
+    }
+
+    .metric-cyan {
+        --card-glow: rgba(56, 189, 248, 0.16);
+        --accent: #0891b2;
+    }
+
+    .metric-pink {
+        --card-glow: rgba(219, 39, 119, 0.12);
+        --accent: #db2777;
+    }
+
+    .metric-green {
+        --card-glow: rgba(22, 163, 74, 0.12);
+        --accent: #16a34a;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-4px);
+        border-color: #bfdbfe;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.13);
+    }
+
+    .metric-top,
+    .metric-body {
+        position: relative;
+        z-index: 1;
+    }
+
+    .metric-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .metric-top span {
+        padding: 6px 10px;
+        border-radius: 999px;
+        color: #1d4ed8;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .metric-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--accent), #60a5fa);
+        box-shadow: 0 16px 34px rgba(37, 99, 235, 0.20);
+    }
+
+    .metric-icon svg {
+        width: 21px;
+        height: 21px;
+    }
+
+    .metric-body {
+        margin-top: 24px;
+    }
+
+    .metric-body strong {
+        display: block;
+        font-size: clamp(30px, 2.4vw, 42px);
+        line-height: 1;
+        letter-spacing: -0.06em;
+        color: var(--dash-text);
+        font-weight: 950;
+    }
+
+    .metric-body p {
+        margin: 9px 0 0;
+        color: var(--dash-muted);
+        font-weight: 750;
+    }
+
+    .sparkline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -4px;
+        width: 100%;
+        height: 74px;
+        opacity: 0.55;
+    }
+
+    .sparkline path {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 4;
+        stroke-linecap: round;
+    }
+
+    .panel {
+        position: relative;
+        overflow: hidden;
+        padding: 24px;
+        border-radius: var(--dash-radius-lg);
+        border: 1px solid var(--dash-border);
+        background: #ffffff;
+        box-shadow: var(--dash-shadow);
+    }
+
+    .panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34%),
+            radial-gradient(circle at bottom left, rgba(56, 189, 248, 0.06), transparent 32%);
+        pointer-events: none;
+    }
+
+    .panel > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 18px;
+        margin-bottom: 22px;
+    }
+
+    .panel-kicker {
+        color: #2563eb;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+    }
+
+    .panel-header h2 {
+        margin: 12px 0 0;
+        color: var(--dash-text);
+        font-size: 24px;
+        line-height: 1.1;
+        letter-spacing: -0.035em;
+        font-weight: 950;
+    }
+
+    .panel-header p {
+        margin: 8px 0 0;
+        color: var(--dash-muted);
+        line-height: 1.6;
+        font-weight: 650;
+    }
+
+    .panel-menu {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 15px;
+        color: #2563eb;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+    }
+
+    .panel-menu svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .insight-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
+        gap: 22px;
+    }
+
+    .chart-box {
+        height: 330px;
+        padding: 14px;
+        border-radius: 22px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .donut-layout {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        align-items: center;
+        gap: 20px;
+    }
+
+    .donut-box {
+        position: relative;
+        width: 190px;
+        height: 190px;
+    }
+
+    .donut-center {
+        position: absolute;
+        inset: 52px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        border-radius: 999px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .donut-center span {
+        color: var(--dash-muted);
+        font-size: 12px;
+        font-weight: 850;
+    }
+
+    .donut-center strong {
+        margin-top: 3px;
+        color: var(--dash-text);
+        font-size: 25px;
+        letter-spacing: -0.04em;
+        font-weight: 950;
+    }
+
+    .audit-list {
+        display: grid;
+        gap: 11px;
+    }
+
+    .audit-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 13px;
+        border-radius: 17px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .audit-row strong {
+        display: block;
+        color: var(--dash-text);
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    .audit-row p {
+        margin: 5px 0 0;
+        color: var(--dash-muted);
+        font-size: 12px;
+        font-weight: 750;
+    }
+
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        box-shadow: 0 0 18px currentColor;
+    }
+
+    .dot-green {
+        color: var(--dash-green);
+        background: var(--dash-green);
+    }
+
+    .dot-red {
+        color: var(--dash-red);
+        background: var(--dash-red);
+    }
+
+    .dot-yellow {
+        color: var(--dash-yellow);
+        background: var(--dash-yellow);
+    }
+
+    .dot-purple {
+        color: var(--dash-purple);
+        background: var(--dash-purple);
+    }
+
+    .operations-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+        gap: 22px;
+    }
+
+    .live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        color: #166534;
+        background: #dcfce7;
+        border: 1px solid #86efac;
+        font-size: 12px;
+        font-weight: 950;
+        white-space: nowrap;
+    }
+
+    .live-badge span {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.10), 0 0 18px rgba(34, 197, 94, 0.8);
+    }
+
+    .health-timeline {
+        display: grid;
+        gap: 14px;
+    }
+
+    .health-step {
+        position: relative;
+        display: grid;
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        border-radius: 20px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .health-step:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        left: 39px;
+        bottom: -15px;
+        width: 1px;
+        height: 15px;
+        background: linear-gradient(to bottom, rgba(37, 99, 235, 0.45), transparent);
+    }
+
+    .health-marker {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 16px;
+        color: #ffffff;
+        background: linear-gradient(135deg, #2563eb, #38bdf8);
+        box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+    }
+
+    .health-marker svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .health-step strong {
+        color: var(--dash-text);
+        font-weight: 900;
+    }
+
+    .health-step p {
+        margin: 5px 0 0;
+        color: var(--dash-muted);
+        line-height: 1.45;
+        font-size: 13px;
+    }
+
+    .health-step em {
+        padding: 7px 10px;
+        border-radius: 999px;
+        color: #166534;
+        background: #dcfce7;
+        border: 1px solid #86efac;
+        font-size: 12px;
+        font-style: normal;
+        font-weight: 950;
+    }
+
+    .quick-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 13px;
+    }
+
+    .quick-tile {
+        min-height: 126px;
+        padding: 17px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border-radius: 20px;
+        color: var(--dash-text);
+        text-decoration: none;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .quick-tile:hover {
+        transform: translateY(-3px);
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        box-shadow: 0 14px 32px rgba(37, 99, 235, 0.12);
+    }
+
+    .quick-tile svg {
+        width: 24px;
+        height: 24px;
+        color: #2563eb;
+    }
+
+    .quick-tile span {
+        display: block;
+        margin-top: 20px;
+        color: var(--dash-text);
+        font-weight: 950;
+    }
+
+    .quick-tile small {
+        display: block;
+        margin-top: 5px;
+        color: var(--dash-muted);
+        font-weight: 700;
+    }
+
+    .quick-wide {
+        grid-column: span 2;
+        min-height: 98px;
+    }
+
+    .summary-card {
+        margin-top: 14px;
+        padding: 18px;
+        border-radius: 22px;
+        background:
+            linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(56, 189, 248, 0.08)),
+            #f8fafc;
+        border: 1px solid #dbeafe;
+    }
+
+    .summary-card span {
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .summary-card strong {
+        display: block;
+        margin-top: 8px;
+        color: var(--dash-text);
+        font-size: 38px;
+        line-height: 1;
+        letter-spacing: -0.06em;
+    }
+
+    .summary-card p {
+        margin: 10px 0 0;
+        color: var(--dash-muted);
+        line-height: 1.55;
+    }
+
+    .small-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 12px;
+        border-radius: 999px;
+        color: #1d4ed8;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .small-link svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .table-frame {
+        overflow-x: auto;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+    }
+
+    .dashboard-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+        background: #ffffff;
+    }
+
+    .dashboard-table th {
+        padding: 16px;
+        text-align: left;
+        color: #334155;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .dashboard-table td {
+        padding: 16px;
+        color: #475569;
+        border-bottom: 1px solid #eef2f7;
+        font-weight: 700;
+    }
+
+    .dashboard-table tr:hover td {
+        background: #f8fafc;
+    }
+
+    .dashboard-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .user-cell span {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        color: #ffffff;
+        background: linear-gradient(135deg, #2563eb, #38bdf8);
+        font-size: 13px;
+        font-weight: 950;
+        box-shadow: 0 12px 28px rgba(37, 99, 235, 0.22);
+    }
+
+    .user-cell strong {
+        color: var(--dash-text);
+        font-size: 13px;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 950;
+    }
+
+    .status-success {
+        background: #dcfce7;
+        border-color: #86efac;
+        color: #166534;
+    }
+
+    .status-failed,
+    .status-denied {
+        background: #fee2e2;
+        border-color: #fca5a5;
+        color: #991b1b;
+    }
+
+    .status-pending-content,
+    .status-pending-confirmation,
+    .status-pending-file-name {
+        background: #fef3c7;
+        border-color: #fcd34d;
+        color: #92400e;
+    }
+
+    .empty-row {
+        text-align: center;
+        color: var(--dash-muted);
+        font-weight: 850;
+    }
+
+    @keyframes dashAurora {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @media (max-width: 1280px) {
+        .metric-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
-        .dashboard-hero {
-            display: flex;
-            justify-content: space-between;
-            gap: 24px;
-            align-items: stretch;
-            padding: 30px;
-            border-radius: 24px;
-            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
-            color: #ffffff;
-            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+        .insight-grid,
+        .operations-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .command-center {
+            grid-template-columns: 1fr;
         }
 
-        .dashboard-eyebrow {
-            display: inline-block;
-            margin-bottom: 10px;
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.14);
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+        .hero-orbit-card {
+            min-height: 300px;
         }
 
-        .dashboard-hero h1 {
-            margin: 0;
-            font-size: 34px;
-            line-height: 1.15;
+        .metric-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .dashboard-hero p {
-            max-width: 720px;
-            margin: 12px 0 0;
-            color: rgba(255, 255, 255, 0.82);
-            line-height: 1.7;
+        .donut-layout {
+            grid-template-columns: 1fr;
         }
 
-        .dashboard-hero-card {
-            min-width: 230px;
-            border-radius: 20px;
-            padding: 22px;
-            background: rgba(255, 255, 255, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+        .donut-box {
+            margin: 0 auto;
         }
+    }
 
-        .dashboard-hero-card span {
-            color: rgba(255, 255, 255, 0.76);
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .dashboard-hero-card strong {
-            margin-top: 8px;
-            font-size: 26px;
-        }
-
-        .dashboard-hero-card small {
-            margin-top: 8px;
-            color: rgba(255, 255, 255, 0.72);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+    @media (max-width: 640px) {
+        .dashboard-shell {
             gap: 18px;
         }
 
-        .audit-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+        .command-center,
+        .panel,
+        .metric-card {
+            border-radius: 22px;
         }
 
-        .stat-card {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 20px;
-            padding: 22px;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
-            transition: transform 0.16s ease, box-shadow 0.16s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
-        }
-
-        .stat-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-icon,
-        .quick-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 14px;
-            background: #eef2ff;
-            color: #3730a3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .audit-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .audit-danger {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .audit-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .stat-icon svg,
-        .quick-icon svg {
-            width: 21px;
-            height: 21px;
-        }
-
-        .stat-tag {
-            padding: 5px 9px;
-            border-radius: 999px;
-            background: #f3f4f6;
-            color: #6b7280;
-            font-size: 12px;
-            font-weight: 800;
-        }
-
-        .stat-value {
-            color: #111827;
-            font-size: 34px;
-            font-weight: 900;
-            line-height: 1;
-        }
-
-        .stat-label {
-            margin-top: 8px;
-            color: #6b7280;
-            font-weight: 700;
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
-            gap: 22px;
-            align-items: stretch;
-        }
-
-        .bottom-grid {
-            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
-        }
-
-        .card {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 20px;
+        .command-center {
             padding: 24px;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
         }
 
-        .card-header-pro {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            margin-bottom: 20px;
+        .command-copy h1 {
+            font-size: 38px;
         }
 
-        .card-header-pro h3 {
-            margin: 0;
-            color: #111827;
-            font-size: 20px;
+        .metric-grid,
+        .quick-grid {
+            grid-template-columns: 1fr;
         }
 
-        .card-header-pro p {
-            margin: 7px 0 0;
-            color: #6b7280;
-            line-height: 1.6;
+        .quick-wide {
+            grid-column: auto;
         }
 
-        .card-pill {
-            white-space: nowrap;
-            padding: 7px 11px;
-            border-radius: 999px;
-            background: #dcfce7;
-            color: #166534;
-            font-size: 12px;
-            font-weight: 800;
+        .panel-header {
+            flex-direction: column;
         }
 
-        .chart-wrap {
-            min-height: 280px;
+        .health-step {
+            grid-template-columns: 44px minmax(0, 1fr);
         }
 
-        .health-list,
-        .quick-links,
-        .insight-list {
-            display: grid;
-            gap: 12px;
+        .health-step em {
+            grid-column: 2;
+            width: max-content;
         }
-
-        .health-item,
-        .quick-link-card,
-        .insight-item {
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            background: #f9fafb;
-        }
-
-        .health-item {
-            display: flex;
-            justify-content: space-between;
-            gap: 14px;
-            align-items: center;
-            padding: 15px;
-        }
-
-        .health-item strong,
-        .quick-link-card span,
-        .insight-item span {
-            display: block;
-            color: #111827;
-            font-weight: 800;
-        }
-
-        .health-item span,
-        .quick-link-card strong {
-            display: block;
-            margin-top: 4px;
-            color: #6b7280;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .health-ok {
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: #dcfce7;
-            color: #166534;
-            font-style: normal;
-            font-size: 12px;
-            font-weight: 800;
-            white-space: nowrap;
-        }
-
-        .quick-link-card {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 15px;
-            text-decoration: none;
-            transition: transform 0.16s ease, background 0.16s ease, border 0.16s ease;
-        }
-
-        .quick-link-card:hover {
-            transform: translateX(3px);
-            background: #eef6ff;
-            border-color: #bfdbfe;
-        }
-
-        .insight-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-        }
-
-        .insight-item strong {
-            color: #1d4ed8;
-            font-size: 22px;
-        }
-
-        .insight-note {
-            margin-top: 4px;
-            border-radius: 16px;
-            padding: 16px;
-            background: #eff6ff;
-            color: #1e40af;
-            line-height: 1.6;
-            font-weight: 600;
-        }
-
-        .latest-card {
-            overflow: hidden;
-        }
-
-        .table-wrap {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        .dashboard-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .dashboard-table th {
-            padding: 14px 16px;
-            text-align: left;
-            background: #f9fafb;
-            color: #374151;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .dashboard-table td {
-            padding: 15px 16px;
-            border-bottom: 1px solid #e5e7eb;
-            color: #374151;
-            font-weight: 600;
-        }
-
-        .dashboard-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: #f3f4f6;
-            color: #374151;
-            font-size: 12px;
-            font-weight: 900;
-        }
-
-        .status-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-failed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .status-pending-content,
-        .status-pending-confirmation,
-        .status-pending-file-name {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-denied {
-            background: #fee2e2;
-            color: #7f1d1d;
-        }
-
-        .empty-row {
-            text-align: center;
-            color: #6b7280;
-            font-weight: 700;
-        }
-
-        @media (max-width: 1180px) {
-            .stats-grid,
-            .audit-grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
-
-            .dashboard-grid,
-            .bottom-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 760px) {
-            .dashboard-hero {
-                flex-direction: column;
-                padding: 24px;
-            }
-
-            .dashboard-hero-card {
-                min-width: 0;
-            }
-
-            .stats-grid,
-            .audit-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .dashboard-hero h1 {
-                font-size: 28px;
-            }
-
-            .card-header-pro {
-                flex-direction: column;
-            }
-        }
-    </style>
+    }
+</style>
 {% endblock %}
 
 {% block javascripts %}
     {{ parent() }}
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const ctx = document.getElementById('dashboardChart');
+            const dashboardCanvas = document.getElementById('dashboardChart');
+            const donutCanvas = document.getElementById('commandDonut');
 
-            if (ctx) {
-                new Chart(ctx, {
+            if (dashboardCanvas) {
+                const ctx = dashboardCanvas.getContext('2d');
+
+                const barGradient = ctx.createLinearGradient(0, 0, 0, 340);
+              barGradient.addColorStop(0, 'rgba(37, 99, 235, 0.96)');
+barGradient.addColorStop(0.45, 'rgba(59, 130, 246, 0.84)');
+barGradient.addColorStop(1, 'rgba(56, 189, 248, 0.72)');
+                new Chart(dashboardCanvas, {
                     type: 'bar',
                     data: {
                         labels: [
@@ -749,31 +1464,36 @@
                                 {{ filesCount }},
                                 {{ voiceCommandsCount }},
                                 {{ historyCount }},
-                                {{ successfulCommandsCount|default(0) }},
-                                {{ failedCommandsCount|default(0) }}
+                               {{ successfulCommandsCount|default(0) }},
+{{ failedCommandsCount|default(0) }}
                             ],
-                            borderRadius: 12,
+                            backgroundColor: barGradient,
+                            borderColor: 'rgba(255, 255, 255, 0.14)',
+                            borderWidth: 1,
+                            borderRadius: 16,
                             borderSkipped: false,
-                            maxBarThickness: 52
+                            maxBarThickness: 58
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {
+                            duration: 950,
+                            easing: 'easeOutQuart'
+                        },
                         plugins: {
                             legend: {
                                 display: false
                             },
                             tooltip: {
-                                backgroundColor: '#111827',
-                                padding: 12,
-                                titleFont: {
-                                    size: 13,
-                                    weight: 'bold'
-                                },
-                                bodyFont: {
-                                    size: 13
-                                },
+                                backgroundColor: 'rgba(15, 23, 42, 0.96)',
+                                titleColor: '#ffffff',
+                                bodyColor: '#cbd5e1',
+                                borderColor: 'rgba(129, 140, 248, 0.45)',
+                                borderWidth: 1,
+                                padding: 13,
+                                displayColors: false,
                                 callbacks: {
                                     label: function(context) {
                                         return 'Total: ' + context.parsed.y;
@@ -786,22 +1506,77 @@
                                 grid: {
                                     display: false
                                 },
+                                border: {
+                                    color: 'rgba(148, 163, 184, 0.14)'
+                                },
                                 ticks: {
-                                    color: '#6b7280',
+                                    color: '#94a3b8',
                                     font: {
-                                        weight: '600'
+                                        weight: '700'
                                     }
                                 }
                             },
                             y: {
                                 beginAtZero: true,
+                                border: {
+                                    color: 'rgba(148, 163, 184, 0.14)'
+                                },
                                 grid: {
-                                    color: '#e5e7eb'
+                                    color: 'rgba(148, 163, 184, 0.10)'
                                 },
                                 ticks: {
                                     precision: 0,
-                                    color: '#6b7280'
+                                    color: '#94a3b8'
                                 }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (donutCanvas) {
+                new Chart(donutCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [
+                            'Successful',
+                            'Failed',
+                            'Pending Content',
+                            'Pending Confirmation'
+                        ],
+                        datasets: [{
+                            data: [
+                               {{ successfulCommandsCount|default(0) }},
+{{ failedCommandsCount|default(0) }},
+{{ pendingContentCount|default(0) }},
+{{ pendingConfirmationCount|default(0) }}
+                            ],
+                            backgroundColor: [
+                                'rgba(34, 197, 94, 0.92)',
+                                'rgba(239, 68, 68, 0.92)',
+                                'rgba(245, 158, 11, 0.92)',
+                                'rgba(139, 92, 246, 0.92)'
+                            ],
+                            borderColor: 'rgba(15, 23, 42, 0.95)',
+                            borderWidth: 5,
+                            hoverOffset: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.96)',
+                                titleColor: '#ffffff',
+                                bodyColor: '#cbd5e1',
+                                borderColor: 'rgba(129, 140, 248, 0.45)',
+                                borderWidth: 1,
+                                padding: 13
                             }
                         }
                     }

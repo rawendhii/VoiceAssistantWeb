@@ -24,6 +24,4 @@ services:
             $huggingFaceToken: '%env(HUGGINGFACE_API_TOKEN)%'
             $huggingFaceModel: '%env(default:huggingface_chat_model:HUGGINGFACE_CHAT_MODEL)%'
 
-    App\Service\YouTubeSearchService:
-        arguments:
-            $youtubeApiKey: '%env(YOUTUBE_API_KEY)%'
+   

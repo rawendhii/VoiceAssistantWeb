@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Voice Assistant Browser Controller",
+  "version": "1.0.0",
+  "description": "Controls supported websites from the Symfony voice assistant.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://www.google.com/*",
+    "https://google.com/*",
+    "https://www.facebook.com/*",
+    "https://facebook.com/*",
+    "https://mail.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "content-app.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://www.google.com/*",
+        "https://google.com/*",
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "content-page.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

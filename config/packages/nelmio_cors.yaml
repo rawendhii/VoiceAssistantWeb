@@ -1,0 +1,45 @@
+nelmio_cors:
+    defaults:
+        origin_regex: true
+        allow_origin:
+            - '^http://localhost(:[0-9]+)?$'
+            - '^http://127\.0\.0\.1(:[0-9]+)?$'
+            - '^https://www\.youtube\.com$'
+            - '^https://youtube\.com$'
+            - '^https://www\.google\.com$'
+            - '^https://google\.com$'
+            - '^https://www\.facebook\.com$'
+            - '^https://facebook\.com$'
+        allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With']
+        expose_headers: ['Link']
+        max_age: 3600
+        allow_credentials: true
+
+    paths:
+        '^/api/voice/interpret':
+            origin_regex: true
+            allow_origin:
+                - '^https://www\.youtube\.com$'
+                - '^https://youtube\.com$'
+                - '^https://www\.google\.com$'
+                - '^https://google\.com$'
+                - '^https://www\.facebook\.com$'
+                - '^https://facebook\.com$'
+                - '^http://localhost(:[0-9]+)?$'
+                - '^http://127\.0\.0\.1(:[0-9]+)?$'
+            allow_methods: ['POST', 'OPTIONS']
+            allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With']
+            allow_credentials: true
+            max_age: 3600
+
+        '^/':
+            origin_regex: true
+            allow_origin:
+                - '^http://localhost(:[0-9]+)?$'
+                - '^http://127\.0\.0\.1(:[0-9]+)?$'
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With']
+            expose_headers: ['Link']
+            max_age: 3600
+            allow_credentials: true

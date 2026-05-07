@@ -1,59 +1,382 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Reset Password{% endblock %}
+{% block title %}Reset Password - Assistant Vocal{% endblock %}
 
 {% block body %}
-<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#f3f4f6; padding:20px;">
-    <div style="width:100%; max-width:480px; background:white; border-radius:18px; padding:36px; box-shadow:0 12px 30px rgba(15,23,42,0.12);">
-
-        <div style="text-align:center; margin-bottom:28px;">
-            <div style="width:64px; height:64px; border-radius:50%; background:#dbeafe; color:#1d4ed8; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:22px; font-weight:800;">
-                PW
+    <main class="reset-page">
+        <section class="reset-card">
+            <div class="reset-bg" aria-hidden="true">
+                <span class="reset-orb reset-orb-one"></span>
+                <span class="reset-orb reset-orb-two"></span>
             </div>
 
-            <h1 style="margin:0; font-size:28px; color:#111827;">Forgot Password?</h1>
-            <p style="margin:10px 0 0; color:#6b7280; line-height:1.6;">
-                Enter your email address and we will send you a secure link to reset your password.
-            </p>
-        </div>
+            <header class="reset-header">
+                <div class="reset-icon">
+                    <i data-lucide="key-round"></i>
+                </div>
 
-        {% for flash_error in app.flashes('reset_password_error') %}
-            <div style="background:#fee2e2; color:#991b1b; padding:12px 14px; border-radius:10px; margin-bottom:18px; font-weight:600;">
-                {{ flash_error }}
+                <span class="reset-kicker">
+                    <i data-lucide="shield-check"></i>
+                    Account Recovery
+                </span>
+
+                <h1>Forgot Password?</h1>
+
+                <p>
+                    Enter your email address and we will send you a secure link to reset your password.
+                </p>
+            </header>
+
+            {% for flash_error in app.flashes('reset_password_error') %}
+                <div class="reset-alert reset-alert-error">
+                    <i data-lucide="triangle-alert"></i>
+                    <span>{{ flash_error }}</span>
+                </div>
+            {% endfor %}
+
+            {{ form_start(requestForm, {'attr': {'class': 'reset-form'}}) }}
+                <div class="reset-form-group">
+                    {{ form_label(requestForm.email, 'Email Address') }}
+
+                    <div class="reset-input-wrap">
+                        <i data-lucide="mail"></i>
+
+                        {{ form_widget(requestForm.email, {
+                            attr: {
+                                placeholder: 'example@email.com',
+                                class: 'reset-input'
+                            }
+                        }) }}
+                    </div>
+
+                    {{ form_errors(requestForm.email) }}
+                </div>
+
+                <button type="submit" class="reset-submit-btn">
+                    <i data-lucide="send"></i>
+                    Send Reset Link
+                </button>
+            {{ form_end(requestForm) }}
+
+            <div class="reset-back-row">
+                <a href="{{ path('app_login') }}">
+                    <i data-lucide="arrow-left"></i>
+                    Back to Login
+                </a>
             </div>
-        {% endfor %}
+        </section>
+    </main>
 
-        {{ form_start(requestForm) }}
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background:
+                radial-gradient(circle at 85% 5%, rgba(37, 99, 235, 0.14), transparent 32%),
+                radial-gradient(circle at 35% 95%, rgba(56, 189, 248, 0.10), transparent 34%),
+                linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%);
+        }
 
-            <div style="margin-bottom:18px;">
-                {{ form_label(requestForm.email, 'Email Address', {
-                    label_attr: {
-                        style: 'display:block; margin-bottom:8px; font-weight:700; color:#374151;'
-                    }
-                }) }}
+        .reset-page,
+        .reset-page * {
+            box-sizing: border-box;
+        }
 
-                {{ form_widget(requestForm.email, {
-                    attr: {
-                        style: 'width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:15px;',
-                        placeholder: 'example@email.com'
-                    }
-                }) }}
+        .reset-page {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            color: #0f172a;
+        }
 
-                {{ form_errors(requestForm.email) }}
-            </div>
+        .reset-card {
+            position: relative;
+            width: min(560px, 100%);
+            overflow: hidden;
+            border-radius: 30px;
+            padding: clamp(26px, 4vw, 40px);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 28px 90px rgba(15, 23, 42, 0.16);
+        }
 
-            <button type="submit"
-                    style="width:100%; padding:14px; border:none; border-radius:10px; background:#2563eb; color:white; font-size:16px; font-weight:700; cursor:pointer;">
-                Send Reset Link
-            </button>
+        .reset-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            height: 220px;
+            background:
+                radial-gradient(circle at 78% 30%, rgba(37, 99, 235, 0.24), transparent 34%),
+                linear-gradient(135deg, #071126 0%, #111827 52%, #172554 100%);
+            pointer-events: none;
+        }
 
-        {{ form_end(requestForm) }}
+        .reset-card::after {
+            content: "";
+            position: absolute;
+            top: -45%;
+            left: -45%;
+            width: 190%;
+            height: 430px;
+            background:
+                conic-gradient(from 0deg, transparent, rgba(59, 130, 246, 0.22), transparent, rgba(56, 189, 248, 0.16), transparent);
+            filter: blur(80px);
+            opacity: 0.72;
+            animation: resetAurora 18s linear infinite;
+            pointer-events: none;
+        }
 
-        <div style="text-align:center; margin-top:22px;">
-            <a href="{{ path('app_login') }}" style="color:#6b7280; text-decoration:none; font-weight:600;">
-                Back to Login
-            </a>
-        </div>
-    </div>
-</div>
+        .reset-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .reset-orb {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(12px);
+            opacity: 0.38;
+            mix-blend-mode: screen;
+        }
+
+        .reset-orb-one {
+            width: 190px;
+            height: 190px;
+            right: 9%;
+            top: 4%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.95), transparent 66%);
+            animation: resetFloatOne 8s ease-in-out infinite;
+        }
+
+        .reset-orb-two {
+            width: 130px;
+            height: 130px;
+            left: 9%;
+            top: 70px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.8), transparent 68%);
+            animation: resetFloatTwo 10s ease-in-out infinite;
+        }
+
+        .reset-header,
+        .reset-alert,
+        .reset-form,
+        .reset-back-row {
+            position: relative;
+            z-index: 1;
+        }
+
+        .reset-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .reset-icon {
+            width: 92px;
+            height: 92px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 18px;
+            border-radius: 28px;
+            color: #ffffff;
+            background:
+                radial-gradient(circle at 35% 25%, rgba(125, 211, 252, 0.95), transparent 34%),
+                linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow:
+                0 0 0 10px rgba(37, 99, 235, 0.18),
+                0 22px 46px rgba(37, 99, 235, 0.38);
+        }
+
+        .reset-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .reset-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            margin-bottom: 14px;
+            border-radius: 999px;
+            color: #bfdbfe;
+            background: rgba(37, 99, 235, 0.18);
+            border: 1px solid rgba(147, 197, 253, 0.24);
+            font-size: 11px;
+            font-weight: 950;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .reset-kicker svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        .reset-header h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: clamp(36px, 5vw, 56px);
+            line-height: 0.98;
+            letter-spacing: -0.06em;
+            font-weight: 950;
+        }
+
+        .reset-header p {
+            margin: 12px 0 0;
+            color: #cbd5e1;
+            font-size: 17px;
+            line-height: 1.5;
+            font-weight: 650;
+        }
+
+        .reset-alert {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            border-radius: 16px;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+
+        .reset-alert svg {
+            width: 20px;
+            height: 20px;
+            flex: 0 0 auto;
+        }
+
+        .reset-alert-error {
+            color: #991b1b;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+        }
+
+        .reset-form {
+            display: grid;
+            gap: 18px;
+            margin-top: 28px;
+        }
+
+        .reset-form-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        .reset-form-group label {
+            color: #334155;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .reset-input-wrap {
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 16px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            transition: 180ms ease;
+        }
+
+        .reset-input-wrap:focus-within {
+            background: #ffffff;
+            border-color: #93c5fd;
+            box-shadow:
+                0 0 0 4px rgba(37, 99, 235, 0.10),
+                0 14px 30px rgba(15, 23, 42, 0.07);
+        }
+
+        .reset-input-wrap svg {
+            width: 22px;
+            height: 22px;
+            color: #2563eb;
+            flex: 0 0 auto;
+        }
+
+        .reset-input {
+            width: 100%;
+            min-height: 56px;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 750;
+        }
+
+        .reset-submit-btn {
+            min-height: 58px;
+            width: 100%;
+            border: 0;
+            border-radius: 18px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 18px 38px rgba(37, 99, 235, 0.30);
+            font-size: 16px;
+            font-weight: 950;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 180ms ease;
+        }
+
+        .reset-submit-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .reset-submit-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .reset-back-row {
+            display: flex;
+            justify-content: center;
+            margin-top: 22px;
+        }
+
+        .reset-back-row a {
+            min-height: 46px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 14px;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .reset-back-row svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        @keyframes resetAurora { to { transform: rotate(360deg); } }
+        @keyframes resetFloatOne { 0%,100%{transform:translate3d(0,0,0) scale(1);} 50%{transform:translate3d(-34px,26px,0) scale(1.12);} }
+        @keyframes resetFloatTwo { 0%,100%{transform:translate3d(0,0,0) scale(1);} 50%{transform:translate3d(38px,-18px,0) scale(1.14);} }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+    </script>
 {% endblock %}

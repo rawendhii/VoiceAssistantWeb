@@ -1,158 +1,838 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-<div style="max-width:1200px; margin:0 auto;">
-
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; flex-wrap:wrap; gap:14px;">
-        <div>
-            <h1 style="margin:0; color:#111827; font-size:32px;">My Files</h1>
-            <p style="margin:8px 0 0; color:#6b7280; line-height:1.6;">
-                View and search files stored inside the web application. For creating, renaming, editing, or deleting files on your computer, use the desktop assistant module.
-            </p>
-        </div>
-
-        <a href="{{ path('front_files') }}" class="btn btn-secondary" style="padding:12px 18px; border-radius:10px; text-decoration:none;">
-            Refresh
-        </a>
-    </div>
-
-    <div class="card" style="padding:22px; border-radius:18px; margin-bottom:20px; background:#eff6ff; border:1px solid #bfdbfe;">
-        <h3 style="margin:0 0 8px; color:#1e3a8a;">Safe Web File Access</h3>
-        <p style="margin:0; color:#1e40af; line-height:1.7;">
-            The web assistant can show and search files registered in the web database. It does not create, rename, edit, or delete files on your computer. Those local computer actions are reserved for the desktop assistant module.
-        </p>
-    </div>
-
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-        <div class="card" style="padding:20px; border-radius:16px;">
-            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Visible Files</span>
-            <strong style="font-size:30px; color:#111827;">{{ files|length }}</strong>
-        </div>
-
-        <div class="card" style="padding:20px; border-radius:16px;">
-            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Voice Shortcut</span>
-            <strong style="font-size:22px; color:#111827;">Space</strong>
-        </div>
-
-        <div class="card" style="padding:20px; border-radius:16px;">
-            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Web Mode</span>
-            <strong style="font-size:22px; color:#111827;">Read Only</strong>
-        </div>
-    </div>
-
-    <div class="card" style="padding:24px; border-radius:18px; margin-bottom:20px;">
-        <form method="get" action="{{ path('front_files') }}" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
-            <div style="min-width:280px; flex:1;">
-                <label for="search" style="display:block; margin-bottom:8px; font-weight:700; color:#374151;">Search</label>
-                <input
-                    id="search"
-                    type="text"
-                    name="search"
-                    value="{{ search }}"
-                    placeholder="Search by file name, path, or type"
-                    style="width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:12px; font-size:15px;"
-                >
+    <main class="files-page">
+        <section class="files-hero">
+            <div class="files-hero-bg" aria-hidden="true">
+                <span class="files-orb files-orb-one"></span>
+                <span class="files-orb files-orb-two"></span>
             </div>
 
-            <div style="min-width:210px;">
-                <label for="type" style="display:block; margin-bottom:8px; font-weight:700; color:#374151;">Filter by Type</label>
-                <select
-                    id="type"
-                    name="type"
-                    style="width:100%; padding:13px 14px; border:1px solid #d1d5db; border-radius:12px; font-size:15px;"
-                >
-                    <option value="">All types</option>
-                    <option value="PDF" {% if typeFilter == 'PDF' %}selected{% endif %}>PDF</option>
-                    <option value="IMAGE" {% if typeFilter == 'IMAGE' %}selected{% endif %}>IMAGE</option>
-                    <option value="DOC" {% if typeFilter == 'DOC' %}selected{% endif %}>DOC</option>
-                    <option value="TXT" {% if typeFilter == 'TXT' %}selected{% endif %}>TXT</option>
-                </select>
-            </div>
+            <div class="files-hero-content">
+                <div>
+                    <span class="files-kicker">
+                        <i data-lucide="folder-open"></i>
+                        Web File Access
+                    </span>
 
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button type="submit" class="btn" style="padding:13px 18px; border-radius:10px;">
-                    Search
-                </button>
+                    <h1>My Files</h1>
 
-                <a href="{{ path('front_files') }}" class="btn btn-secondary" style="padding:13px 18px; border-radius:10px; text-decoration:none;">
-                    Reset
+                    <p>
+                        View and search files stored inside the web application. Local computer file actions
+                        are handled by the desktop assistant module.
+                    </p>
+                </div>
+
+                <a href="{{ path('front_files') }}" class="files-refresh-btn">
+                    <i data-lucide="refresh-cw"></i>
+                    Refresh
                 </a>
             </div>
-        </form>
-    </div>
+        </section>
 
-    <div class="card" style="padding:24px; border-radius:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <section class="files-info-card">
+            <div class="files-info-icon">
+                <i data-lucide="shield-check"></i>
+            </div>
+
             <div>
-                <h3 style="margin:0; color:#111827;">File List</h3>
-                <p style="margin:6px 0 0; color:#6b7280;">
-                    Files stored in the web database. Local computer file actions are handled by the desktop assistant module.
+                <span class="section-label">Safe Web File Access</span>
+                <h2>Read-only web mode</h2>
+                <p>
+                    The web assistant can show and search files registered in the web database.
+                    It does not create, rename, edit, or delete files on your computer.
                 </p>
             </div>
-        </div>
+        </section>
 
-        <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:70px;">ID</th>
-                        <th>File Name</th>
-                        <th>Path</th>
-                        <th>Type</th>
-                        <th>Created</th>
-                        <th>Updated</th>
-                    </tr>
-                </thead>
+        <section class="files-stats-grid">
+            <article class="files-stat-card">
+                <div class="files-stat-icon">
+                    <i data-lucide="files"></i>
+                </div>
 
-                <tbody>
-                {% for file in files %}
-                    <tr>
-                        <td>{{ file.id }}</td>
+                <div>
+                    <span>Visible Files</span>
+                    <strong>{{ files|length }}</strong>
+                </div>
+            </article>
 
-                        <td>
-                            <strong style="color:#111827;">{{ file.fileName }}</strong>
-                        </td>
+            <article class="files-stat-card">
+                <div class="files-stat-icon">
+                    <i data-lucide="keyboard"></i>
+                </div>
 
-                        <td style="max-width:420px; color:#4b5563; word-break:break-all;">
-                            {{ file.filePath }}
-                        </td>
+                <div>
+                    <span>Voice Shortcut</span>
+                    <strong>Space</strong>
+                </div>
+            </article>
 
-                        <td>
-                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:13px; font-weight:700;">
-                                {{ file.fileType }}
-                            </span>
-                        </td>
+            <article class="files-stat-card">
+                <div class="files-stat-icon">
+                    <i data-lucide="eye"></i>
+                </div>
 
-                        <td>{{ file.createdAt ? file.createdAt|date('Y-m-d H:i') : '-' }}</td>
-                        <td>{{ file.updatedAt ? file.updatedAt|date('Y-m-d H:i') : '-' }}</td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="6" style="text-align:center; padding:28px; color:#6b7280;">
-                            No files found. This web page only displays files already stored in the application.
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                <div>
+                    <span>Web Mode</span>
+                    <strong>Read Only</strong>
+                </div>
+            </article>
+        </section>
 
-        {% if totalPages > 1 %}
-            <div style="margin-top:18px; display:flex; gap:8px; flex-wrap:wrap;">
-                {% for p in 1..totalPages %}
-                    <a href="{{ path('front_files', {
-                        page: p,
-                        search: search,
-                        type: typeFilter
-                    }) }}"
-                       class="btn {{ p == page ? '' : 'btn-secondary' }}"
-                       style="padding:10px 14px; border-radius:10px; text-decoration:none;">
-                        {{ p }}
+        <section class="files-search-card">
+            <form method="get" action="{{ path('front_files') }}" class="files-search-form">
+                <div class="files-form-group files-form-grow">
+                    <label for="search">Search</label>
+
+                    <div class="files-input-wrap">
+                        <i data-lucide="search"></i>
+
+                        <input
+                            id="search"
+                            type="text"
+                            name="search"
+                            value="{{ search }}"
+                            placeholder="Search by file name, path, or type"
+                        >
+                    </div>
+                </div>
+
+                <div class="files-form-group">
+                    <label for="type">Filter by Type</label>
+
+                    <div class="files-input-wrap">
+                        <i data-lucide="filter"></i>
+
+                        <select id="type" name="type">
+                            <option value="">All types</option>
+                            <option value="PDF" {% if typeFilter == 'PDF' %}selected{% endif %}>PDF</option>
+                            <option value="IMAGE" {% if typeFilter == 'IMAGE' %}selected{% endif %}>IMAGE</option>
+                            <option value="DOC" {% if typeFilter == 'DOC' %}selected{% endif %}>DOC</option>
+                            <option value="TXT" {% if typeFilter == 'TXT' %}selected{% endif %}>TXT</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="files-form-actions">
+                    <button type="submit" class="files-btn files-btn-primary">
+                        <i data-lucide="search"></i>
+                        Search
+                    </button>
+
+                    <a href="{{ path('front_files') }}" class="files-btn files-btn-secondary">
+                        <i data-lucide="rotate-ccw"></i>
+                        Reset
                     </a>
-                {% endfor %}
-            </div>
-        {% endif %}
-    </div>
+                </div>
+            </form>
+        </section>
 
-</div>
+        <section class="files-table-card">
+            <div class="files-table-header">
+                <div>
+                    <span class="section-label">File list</span>
+                    <h2>Stored web files</h2>
+                    <p>
+                        Files stored in the web database. Local computer file actions are handled by the desktop assistant module.
+                    </p>
+                </div>
+
+                <div class="files-count-badge">
+                    {{ files|length }} visible
+                </div>
+            </div>
+
+            <div class="files-table-wrap">
+                <table class="files-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">ID</th>
+                            <th>File Name</th>
+                            <th>Path</th>
+                            <th>Type</th>
+                            <th>Created</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                    {% for file in files %}
+                        <tr>
+                            <td>
+                                <span class="file-id">#{{ file.id }}</span>
+                            </td>
+
+                            <td>
+                                <strong class="file-name">{{ file.fileName }}</strong>
+                            </td>
+
+                            <td class="file-path">
+                                {{ file.filePath }}
+                            </td>
+
+                            <td>
+                                <span class="file-type">
+                                    {{ file.fileType }}
+                                </span>
+                            </td>
+
+                            <td>{{ file.createdAt ? file.createdAt|date('Y-m-d H:i') : '-' }}</td>
+                            <td>{{ file.updatedAt ? file.updatedAt|date('Y-m-d H:i') : '-' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="files-empty">
+                                <div>
+                                    <i data-lucide="file-x"></i>
+                                    <strong>No files found.</strong>
+                                    <span>This web page only displays files already stored in the application.</span>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if totalPages > 1 %}
+                <nav class="files-pagination" aria-label="Files pagination">
+                    {% for p in 1..totalPages %}
+                        <a href="{{ path('front_files', {
+                            page: p,
+                            search: search,
+                            type: typeFilter
+                        }) }}"
+                           class="files-page-link {{ p == page ? 'active' : '' }}">
+                            {{ p }}
+                        </a>
+                    {% endfor %}
+                </nav>
+            {% endif %}
+        </section>
+    </main>
+
+    <style>
+        .files-page,
+        .files-page * {
+            box-sizing: border-box;
+        }
+
+        .files-page {
+            max-width: 1180px;
+            margin: 0 auto;
+            display: grid;
+            gap: 22px;
+            color: #0f172a;
+        }
+
+        .files-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            min-height: 260px;
+            background:
+                radial-gradient(circle at 78% 30%, rgba(37, 99, 235, 0.24), transparent 34%),
+                linear-gradient(135deg, #071126 0%, #111827 52%, #172554 100%);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.20);
+        }
+
+        .files-hero::before {
+            content: "";
+            position: absolute;
+            inset: -50%;
+            background:
+                conic-gradient(
+                    from 0deg,
+                    transparent,
+                    rgba(59, 130, 246, 0.22),
+                    transparent,
+                    rgba(56, 189, 248, 0.16),
+                    transparent,
+                    rgba(96, 165, 250, 0.18),
+                    transparent
+                );
+            filter: blur(80px);
+            opacity: 0.72;
+            animation: filesAurora 18s linear infinite;
+        }
+
+        .files-hero-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .files-orb {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(12px);
+            opacity: 0.45;
+            mix-blend-mode: screen;
+        }
+
+        .files-orb-one {
+            width: 220px;
+            height: 220px;
+            right: 12%;
+            top: 10%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.95), transparent 66%);
+            animation: filesFloatOne 8s ease-in-out infinite;
+        }
+
+        .files-orb-two {
+            width: 160px;
+            height: 160px;
+            left: 8%;
+            bottom: -42px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.8), transparent 68%);
+            animation: filesFloatTwo 10s ease-in-out infinite;
+        }
+
+        .files-hero-content {
+            position: relative;
+            z-index: 1;
+            min-height: 260px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: clamp(26px, 4vw, 46px);
+        }
+
+        .files-kicker,
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: max-content;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 950;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .files-kicker {
+            color: #bfdbfe;
+            background: rgba(37, 99, 235, 0.18);
+            border: 1px solid rgba(147, 197, 253, 0.24);
+            margin-bottom: 14px;
+        }
+
+        .files-kicker svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        .files-hero h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: clamp(42px, 5vw, 70px);
+            line-height: 0.98;
+            letter-spacing: -0.065em;
+            font-weight: 950;
+        }
+
+        .files-hero p {
+            max-width: 760px;
+            margin: 14px 0 0;
+            color: #cbd5e1;
+            font-size: 17px;
+            line-height: 1.6;
+            font-weight: 650;
+        }
+
+        .files-refresh-btn {
+            min-height: 52px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 0 18px;
+            border-radius: 16px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.28);
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 950;
+            transition: 180ms ease;
+        }
+
+        .files-refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 22px 44px rgba(37, 99, 235, 0.38);
+        }
+
+        .files-refresh-btn svg {
+            width: 19px;
+            height: 19px;
+        }
+
+        .files-info-card,
+        .files-stat-card,
+        .files-search-card,
+        .files-table-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        .files-info-card {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            padding: 24px;
+        }
+
+        .files-info-icon,
+        .files-stat-icon {
+            flex: 0 0 auto;
+            width: 58px;
+            height: 58px;
+            display: grid;
+            place-items: center;
+            border-radius: 18px;
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .files-info-icon svg,
+        .files-stat-icon svg {
+            width: 27px;
+            height: 27px;
+        }
+
+        .section-label {
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            margin-bottom: 8px;
+        }
+
+        .files-info-card h2,
+        .files-table-header h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: clamp(26px, 2.8vw, 40px);
+            line-height: 1.08;
+            letter-spacing: -0.045em;
+            font-weight: 950;
+        }
+
+        .files-info-card p,
+        .files-table-header p {
+            margin: 10px 0 0;
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+            font-weight: 650;
+        }
+
+        .files-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .files-stat-card {
+            min-height: 122px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 22px;
+        }
+
+        .files-stat-card span {
+            display: block;
+            margin-bottom: 6px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .files-stat-card strong {
+            display: block;
+            color: #0f172a;
+            font-size: clamp(24px, 2.6vw, 34px);
+            line-height: 1;
+            letter-spacing: -0.04em;
+            font-weight: 950;
+        }
+
+        .files-search-card,
+        .files-table-card {
+            padding: 24px;
+        }
+
+        .files-search-form {
+            display: flex;
+            align-items: end;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .files-form-group {
+            min-width: 220px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .files-form-grow {
+            min-width: 280px;
+            flex: 1;
+        }
+
+        .files-form-group label {
+            color: #334155;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .files-input-wrap {
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 16px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            transition: 180ms ease;
+        }
+
+        .files-input-wrap:focus-within {
+            background: #ffffff;
+            border-color: #93c5fd;
+            box-shadow:
+                0 0 0 4px rgba(37, 99, 235, 0.10),
+                0 14px 30px rgba(15, 23, 42, 0.07);
+        }
+
+        .files-input-wrap svg {
+            width: 22px;
+            height: 22px;
+            color: #2563eb;
+            flex: 0 0 auto;
+        }
+
+        .files-input-wrap input,
+        .files-input-wrap select {
+            width: 100%;
+            min-height: 54px;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 750;
+        }
+
+        .files-form-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .files-btn {
+            min-height: 58px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 18px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 950;
+            cursor: pointer;
+            transition: 180ms ease;
+        }
+
+        .files-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .files-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .files-btn-primary {
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.26);
+        }
+
+        .files-btn-secondary {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .files-table-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+
+        .files-count-badge {
+            min-height: 46px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            font-size: 14px;
+            font-weight: 950;
+        }
+
+        .files-table-wrap {
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #ffffff;
+        }
+
+        .files-table {
+            width: 100%;
+            min-width: 900px;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        .files-table th {
+            padding: 16px;
+            color: #334155;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 950;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .files-table td {
+            padding: 16px;
+            color: #475569;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 14px;
+            line-height: 1.45;
+            font-weight: 700;
+            vertical-align: middle;
+        }
+
+        .files-table tbody tr:hover td {
+            background: #f8fafc;
+        }
+
+        .files-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .file-id {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            min-height: 34px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .file-name {
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 950;
+        }
+
+        .file-path {
+            max-width: 420px;
+            word-break: break-all;
+        }
+
+        .file-type {
+            display: inline-flex;
+            align-items: center;
+            min-height: 34px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .files-empty {
+            padding: 42px 20px !important;
+            text-align: center;
+        }
+
+        .files-empty div {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+        }
+
+        .files-empty svg {
+            width: 42px;
+            height: 42px;
+            color: #94a3b8;
+        }
+
+        .files-empty strong {
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 950;
+        }
+
+        .files-empty span {
+            color: #64748b;
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        .files-pagination {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .files-page-link {
+            min-width: 42px;
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 13px;
+            border-radius: 14px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 950;
+            transition: 180ms ease;
+        }
+
+        .files-page-link:hover {
+            transform: translateY(-2px);
+            background: #dbeafe;
+        }
+
+        .files-page-link.active {
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: transparent;
+            box-shadow: 0 12px 26px rgba(37, 99, 235, 0.24);
+        }
+
+        @keyframes filesAurora {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes filesFloatOne {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(-38px, 28px, 0) scale(1.12);
+            }
+        }
+
+        @keyframes filesFloatTwo {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(48px, -22px, 0) scale(1.14);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        @media (max-width: 960px) {
+            .files-hero-content {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .files-stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .files-info-card {
+                flex-direction: column;
+            }
+
+            .files-form-group,
+            .files-form-grow,
+            .files-form-actions,
+            .files-btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .files-page {
+                gap: 16px;
+            }
+
+            .files-hero,
+            .files-info-card,
+            .files-stat-card,
+            .files-search-card,
+            .files-table-card {
+                border-radius: 22px;
+            }
+
+            .files-hero h1 {
+                font-size: 40px;
+            }
+
+            .files-table-header {
+                flex-direction: column;
+            }
+
+            .files-count-badge {
+                width: 100%;
+            }
+        }
+    </style>
 {% endblock %}

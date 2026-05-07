@@ -1,85 +1,637 @@
 {% extends 'front/layout.html.twig' %}
 
 {% block front_content %}
-<div style="max-width:1100px; margin:0 auto;">
+    <main class="voice-commands-page">
+        <section class="voice-hero">
+            <div class="voice-hero-bg" aria-hidden="true">
+                <span class="voice-orb voice-orb-one"></span>
+                <span class="voice-orb voice-orb-two"></span>
+            </div>
 
-    <div style="margin-bottom:24px;">
-        <h1 style="margin:0; color:#111827; font-size:32px;">Voice Commands</h1>
-        <p style="margin:8px 0 0; color:#6b7280; line-height:1.6;">
-            These are the active commands that the assistant can understand and execute. 
-            You can press <strong>Space</strong> anywhere in the user area to speak.
-        </p>
-    </div>
+            <div class="voice-hero-content">
+                <div>
+                    <span class="voice-kicker">
+                        <i data-lucide="mic-2"></i>
+                        Voice Command Center
+                    </span>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:22px;">
-        <div class="card" style="padding:20px; border-radius:16px;">
-            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Active Commands</span>
-            <strong style="font-size:30px; color:#111827;">{{ commands|length }}</strong>
-        </div>
+                    <h1>Voice Commands</h1>
 
-        <div class="card" style="padding:20px; border-radius:16px;">
-            <span style="display:block; color:#6b7280; font-size:14px; margin-bottom:6px;">Shortcut</span>
-            <strong style="font-size:22px; color:#111827;">Space</strong>
-        </div>
+                    <p>
+                        These are the active commands that the assistant can understand and execute.
+                        Press <strong>Space</strong> anywhere in the user area to speak.
+                    </p>
+                </div>
 
-       
-    </div>
+                <div class="voice-hero-icon" aria-hidden="true">
+                    <i data-lucide="audio-lines"></i>
+                </div>
+            </div>
+        </section>
 
-    <div class="card" style="padding:24px; border-radius:18px; margin-bottom:22px;">
-        <h3 style="margin:0 0 10px; color:#111827;">How to use the assistant</h3>
-        <p style="margin:0; color:#6b7280; line-height:1.7;">
-            Press <strong>Space</strong>, speak naturally, and wait for the assistant response.
-            For sensitive actions such as deleting a file, the assistant will ask for confirmation before continuing.
-        </p>
-    </div>
+        <section class="voice-stats-grid">
+            <article class="voice-stat-card">
+                <div class="voice-stat-icon">
+                    <i data-lucide="list-checks"></i>
+                </div>
 
-    <div class="card" style="padding:24px; border-radius:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+                <div>
+                    <span>Active Commands</span>
+                    <strong>{{ commands|length }}</strong>
+                </div>
+            </article>
+
+            <article class="voice-stat-card">
+                <div class="voice-stat-icon">
+                    <i data-lucide="keyboard"></i>
+                </div>
+
+                <div>
+                    <span>Shortcut</span>
+                    <strong>Space</strong>
+                </div>
+            </article>
+
+            <article class="voice-stat-card">
+                <div class="voice-stat-icon">
+                    <i data-lucide="shield-check"></i>
+                </div>
+
+                <div>
+                    <span>Safety</span>
+                    <strong>Confirm First</strong>
+                </div>
+            </article>
+        </section>
+
+        <section class="voice-guide-card">
+            <div class="voice-guide-icon">
+                <i data-lucide="sparkles"></i>
+            </div>
+
             <div>
-                <h3 style="margin:0; color:#111827;">Available Commands</h3>
-                <p style="margin:6px 0 0; color:#6b7280;">
-                    The assistant can understand natural phrases related to these commands.
+                <span class="section-label">How to use the assistant</span>
+                <h2>Speak naturally. The assistant handles the action.</h2>
+
+                <p>
+                    Press <strong>Space</strong>, speak naturally, and wait for the assistant response.
+                    For sensitive actions such as deleting a file, the assistant will ask for confirmation before continuing.
                 </p>
             </div>
-        </div>
+        </section>
 
-        <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:70px;">ID</th>
-                        <th>Label</th>
-                        <th>Keyword</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for command in commands %}
-                    <tr>
-                        <td>{{ command.id }}</td>
-                        <td>
-                            <strong style="color:#111827;">{{ command.label }}</strong>
-                        </td>
-                        <td>
-                            <span style="display:inline-block; padding:6px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:13px; font-weight:700;">
-                                {{ command.keyword }}
-                            </span>
-                        </td>
-                        <td style="color:#4b5563;">
-                            {{ command.description ?: 'No description provided.' }}
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="4" style="text-align:center; color:#6b7280; padding:24px;">
-                            No active voice commands found.
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+        <section class="voice-table-card">
+            <div class="voice-table-header">
+                <div>
+                    <span class="section-label">Available commands</span>
+                    <h2>Commands the assistant can understand</h2>
 
-</div>
+                    <p>
+                        The assistant can understand natural phrases related to these commands.
+                    </p>
+                </div>
+
+                <div class="voice-count-badge">
+                    {{ commands|length }} active
+                </div>
+            </div>
+
+            <div class="voice-table-wrap">
+                <table class="voice-command-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">ID</th>
+                            <th>Label</th>
+                            <th>Keyword</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                    {% for command in commands %}
+                        <tr>
+                            <td>
+                                <span class="command-id">#{{ command.id }}</span>
+                            </td>
+
+                            <td>
+                                <strong class="command-label">{{ command.label }}</strong>
+                            </td>
+
+                            <td>
+                                <span class="command-keyword">{{ command.keyword }}</span>
+                            </td>
+
+                            <td class="command-description">
+                                {{ command.description ?: 'No description provided.' }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="voice-empty">
+                                <div>
+                                    <i data-lucide="mic-off"></i>
+                                    <strong>No active voice commands found.</strong>
+                                    <span>Add active commands so users can control the app by voice.</span>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <style>
+        .voice-commands-page,
+        .voice-commands-page * {
+            box-sizing: border-box;
+        }
+
+        .voice-commands-page {
+            max-width: 1180px;
+            margin: 0 auto;
+            display: grid;
+            gap: 22px;
+            color: #0f172a;
+        }
+
+        .voice-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            min-height: 260px;
+            background:
+                radial-gradient(circle at 78% 30%, rgba(37, 99, 235, 0.24), transparent 34%),
+                linear-gradient(135deg, #071126 0%, #111827 52%, #172554 100%);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.20);
+        }
+
+        .voice-hero::before {
+            content: "";
+            position: absolute;
+            inset: -50%;
+            background:
+                conic-gradient(
+                    from 0deg,
+                    transparent,
+                    rgba(59, 130, 246, 0.22),
+                    transparent,
+                    rgba(56, 189, 248, 0.16),
+                    transparent,
+                    rgba(96, 165, 250, 0.18),
+                    transparent
+                );
+            filter: blur(80px);
+            opacity: 0.72;
+            animation: voiceAurora 18s linear infinite;
+        }
+
+        .voice-hero-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .voice-orb {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(12px);
+            opacity: 0.45;
+            mix-blend-mode: screen;
+        }
+
+        .voice-orb-one {
+            width: 220px;
+            height: 220px;
+            right: 12%;
+            top: 10%;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.95), transparent 66%);
+            animation: voiceFloatOne 8s ease-in-out infinite;
+        }
+
+        .voice-orb-two {
+            width: 160px;
+            height: 160px;
+            left: 8%;
+            bottom: -42px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.8), transparent 68%);
+            animation: voiceFloatTwo 10s ease-in-out infinite;
+        }
+
+        .voice-hero-content {
+            position: relative;
+            z-index: 1;
+            min-height: 260px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: clamp(26px, 4vw, 46px);
+        }
+
+        .voice-kicker,
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: max-content;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 950;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .voice-kicker {
+            color: #bfdbfe;
+            background: rgba(37, 99, 235, 0.18);
+            border: 1px solid rgba(147, 197, 253, 0.24);
+            margin-bottom: 14px;
+        }
+
+        .voice-kicker svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        .voice-hero h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: clamp(42px, 5vw, 70px);
+            line-height: 0.98;
+            letter-spacing: -0.065em;
+            font-weight: 950;
+        }
+
+        .voice-hero p {
+            max-width: 760px;
+            margin: 14px 0 0;
+            color: #cbd5e1;
+            font-size: 17px;
+            line-height: 1.6;
+            font-weight: 650;
+        }
+
+        .voice-hero p strong {
+            color: #ffffff;
+        }
+
+        .voice-hero-icon {
+            width: 150px;
+            height: 150px;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 42px;
+            color: #7dd3fc;
+            background:
+                radial-gradient(circle at 35% 25%, rgba(125, 211, 252, 0.35), transparent 38%),
+                rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(226, 232, 240, 0.14);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.08),
+                0 22px 55px rgba(37, 99, 235, 0.24);
+        }
+
+        .voice-hero-icon svg {
+            width: 72px;
+            height: 72px;
+            filter: drop-shadow(0 0 18px rgba(125, 211, 252, 0.8));
+            animation: voiceIconFloat 3s ease-in-out infinite;
+        }
+
+        .voice-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .voice-stat-card,
+        .voice-guide-card,
+        .voice-table-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        .voice-stat-card {
+            min-height: 122px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 22px;
+        }
+
+        .voice-stat-icon,
+        .voice-guide-icon {
+            flex: 0 0 auto;
+            width: 58px;
+            height: 58px;
+            display: grid;
+            place-items: center;
+            border-radius: 18px;
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .voice-stat-icon svg,
+        .voice-guide-icon svg {
+            width: 27px;
+            height: 27px;
+        }
+
+        .voice-stat-card span {
+            display: block;
+            margin-bottom: 6px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .voice-stat-card strong {
+            display: block;
+            color: #0f172a;
+            font-size: clamp(24px, 2.6vw, 34px);
+            line-height: 1;
+            letter-spacing: -0.04em;
+            font-weight: 950;
+        }
+
+        .voice-guide-card {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            padding: 24px;
+        }
+
+        .section-label {
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            margin-bottom: 8px;
+        }
+
+        .voice-guide-card h2,
+        .voice-table-header h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: clamp(26px, 2.8vw, 40px);
+            line-height: 1.08;
+            letter-spacing: -0.045em;
+            font-weight: 950;
+        }
+
+        .voice-guide-card p,
+        .voice-table-header p {
+            margin: 10px 0 0;
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+            font-weight: 650;
+        }
+
+        .voice-table-card {
+            padding: 24px;
+        }
+
+        .voice-table-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+
+        .voice-count-badge {
+            min-height: 46px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            font-size: 14px;
+            font-weight: 950;
+        }
+
+        .voice-table-wrap {
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #ffffff;
+        }
+
+        .voice-command-table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            background: #ffffff;
+        }
+
+        .voice-command-table th {
+            padding: 16px;
+            color: #334155;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 950;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .voice-command-table td {
+            padding: 16px;
+            color: #475569;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 14px;
+            line-height: 1.45;
+            font-weight: 700;
+            vertical-align: middle;
+        }
+
+        .voice-command-table tbody tr:hover td {
+            background: #f8fafc;
+        }
+
+        .voice-command-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .command-id {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            min-height: 34px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .command-label {
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 950;
+        }
+
+        .command-keyword {
+            display: inline-flex;
+            align-items: center;
+            min-height: 34px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .command-description {
+            color: #475569;
+        }
+
+        .voice-empty {
+            padding: 42px 20px !important;
+            text-align: center;
+        }
+
+        .voice-empty div {
+            display: grid;
+            justify-items: center;
+            gap: 8px;
+        }
+
+        .voice-empty svg {
+            width: 42px;
+            height: 42px;
+            color: #94a3b8;
+        }
+
+        .voice-empty strong {
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 950;
+        }
+
+        .voice-empty span {
+            color: #64748b;
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        @keyframes voiceAurora {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes voiceFloatOne {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(-38px, 28px, 0) scale(1.12);
+            }
+        }
+
+        @keyframes voiceFloatTwo {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(48px, -22px, 0) scale(1.14);
+            }
+        }
+
+        @keyframes voiceIconFloat {
+            0%, 100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        @media (max-width: 960px) {
+            .voice-hero-content {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .voice-hero-icon {
+                width: 120px;
+                height: 120px;
+                border-radius: 34px;
+            }
+
+            .voice-hero-icon svg {
+                width: 58px;
+                height: 58px;
+            }
+
+            .voice-stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .voice-guide-card {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .voice-commands-page {
+                gap: 16px;
+            }
+
+            .voice-hero,
+            .voice-stat-card,
+            .voice-guide-card,
+            .voice-table-card {
+                border-radius: 22px;
+            }
+
+            .voice-hero h1 {
+                font-size: 40px;
+            }
+
+            .voice-table-header {
+                flex-direction: column;
+            }
+
+            .voice-count-badge {
+                width: 100%;
+            }
+        }
+    </style>
 {% endblock %}
