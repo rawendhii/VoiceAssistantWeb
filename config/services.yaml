@@ -16,8 +16,9 @@ services:
     App\Service\GeminiChatService:
         arguments:
             $geminiApiKey: '%env(GEMINI_API_KEY)%'
+            $geminiModel: '%env(default:gemini_model:GEMINI_MODEL)%'
 
-    App\Service\GeminiCommandInterpreterService:
+    App\Service\GeminiCommandPlannerService:
         arguments:
             $geminiApiKey: '%env(GEMINI_API_KEY)%'
             $geminiModel: '%env(default:gemini_model:GEMINI_MODEL)%'

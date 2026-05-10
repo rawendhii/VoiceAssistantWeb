@@ -1,4 +1,10 @@
-const SYMFONY_VOICE_API_URL = 'http://127.0.0.1:8000/api/voice/interpret';
+const DEFAULT_ASSISTANT_ORIGIN = 'http://localhost:8000';
+const FALLBACK_ASSISTANT_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000'
+];
+
+let assistantOrigin = DEFAULT_ASSISTANT_ORIGIN;
 
 let controlledTabId = null;
 let assistantTabId = null;
@@ -29,11 +35,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'ASSISTANT_TAB_READY') {
         if (sender.tab && sender.tab.id) {
             assistantTabId = sender.tab.id;
+
+            const origin = getOriginFromUrl(sender.tab.url || '');
+
+            if (origin) {
+                assistantOrigin = origin;
+            }
         }
 
         sendResponse({
             success: true,
-            message: 'Assistant tab registered.'
+            message: 'Assistant tab registered.',
+            assistantOrigin: assistantOrigin
         });
 
         return true;
@@ -43,7 +56,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (sender.tab && sender.tab.id) {
             const tabUrl = sender.tab.url || '';
 
-            if (controlledTabId === sender.tab.id || isSupportedExternalPage(tabUrl)) {
+            if (isSupportedExternalPage(tabUrl)) {
                 controlledTabId = sender.tab.id;
                 lastControlledContext = message.context || null;
 
@@ -65,6 +78,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'GET_CONTROLLED_CONTEXT') {
         sendResponse({
             success: true,
+            context: buildMemoryContext(message.browserContext || null)
+        });
+
+        return true;
+    }
+
+    if (message.type === 'GET_ASSISTANT_STATUS') {
+        sendResponse({
+            success: true,
+            assistantTabId: assistantTabId,
+            controlledTabId: controlledTabId,
+            assistantOrigin: assistantOrigin,
             context: buildMemoryContext(message.browserContext || null)
         });
 
@@ -107,7 +132,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 async function handlePageVoiceCommand(message, sender) {
     if (sender.tab && sender.tab.id) {
-        controlledTabId = sender.tab.id;
+        const tabUrl = sender.tab.url || '';
+
+        if (isSupportedExternalPage(tabUrl)) {
+            controlledTabId = sender.tab.id;
+        }
+
+        if (isAssistantPage(tabUrl)) {
+            assistantTabId = sender.tab.id;
+
+            const origin = getOriginFromUrl(tabUrl);
+
+            if (origin) {
+                assistantOrigin = origin;
+            }
+        }
     }
 
     const originalText = message.text || '';
@@ -121,16 +160,52 @@ async function handlePageVoiceCommand(message, sender) {
         memoryContext
     );
 
-    if (!apiResult.success) {
+    if (!apiResult || apiResult.success === false) {
         return {
             success: false,
-            message: apiResult.speech || apiResult.message || 'I did not understand the command.'
+            message: apiResult?.speech || apiResult?.message || 'I did not understand the command.'
         };
     }
 
     updateMemoryFromApiResult(apiResult, originalText, browserContext);
 
-    if (apiResult.intent === 'BROWSER_ACTION' && apiResult.extensionCommand) {
+    if (
+        apiResult.frontendAction &&
+        apiResult.frontendAction.type === 'NAVIGATE' &&
+        apiResult.frontendAction.url
+    ) {
+        const navigationResult = await executeFrontendNavigation(apiResult.frontendAction.url);
+
+        return {
+            success: navigationResult.success !== false,
+            message:
+                navigationResult.message ||
+                apiResult.speech ||
+                apiResult.message ||
+                'Opening the requested page.'
+        };
+    }
+
+    if (
+        apiResult.intent === 'APP_NAVIGATION' &&
+        apiResult.url
+    ) {
+        const navigationResult = await executeFrontendNavigation(apiResult.url);
+
+        return {
+            success: navigationResult.success !== false,
+            message:
+                navigationResult.message ||
+                apiResult.speech ||
+                apiResult.message ||
+                'Opening the requested page.'
+        };
+    }
+
+    if (
+        apiResult.intent === 'BROWSER_ACTION' &&
+        apiResult.extensionCommand
+    ) {
         const speechMessage =
             apiResult.speech ||
             apiResult.message ||
@@ -144,7 +219,10 @@ async function handlePageVoiceCommand(message, sender) {
         };
     }
 
-    if (apiResult.intent === 'WEBSITE_ACTION' && apiResult.extensionCommand) {
+    if (
+        apiResult.intent === 'WEBSITE_ACTION' &&
+        apiResult.extensionCommand
+    ) {
         const speechMessage =
             apiResult.speech ||
             apiResult.message ||
@@ -159,6 +237,23 @@ async function handlePageVoiceCommand(message, sender) {
     }
 
     if (apiResult.intent === 'EMAIL_ACTION') {
+        if (
+            apiResult.frontendAction &&
+            apiResult.frontendAction.type === 'NAVIGATE' &&
+            apiResult.frontendAction.url
+        ) {
+            const navigationResult = await executeFrontendNavigation(apiResult.frontendAction.url);
+
+            return {
+                success: navigationResult.success !== false,
+                message:
+                    apiResult.speech ||
+                    apiResult.message ||
+                    navigationResult.message ||
+                    'Opening Gmail connection.'
+            };
+        }
+
         return {
             success: apiResult.success !== false,
             message: apiResult.speech || apiResult.message || 'Email action completed.'
@@ -172,24 +267,62 @@ async function handlePageVoiceCommand(message, sender) {
 }
 
 async function interpretVoiceCommandWithSymfony(text, language, browserContext) {
-    const response = await fetch(SYMFONY_VOICE_API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-            text: text,
-            language: language,
-            browserContext: browserContext
-        })
-    });
+    const origins = getAssistantOriginsToTry();
 
-    if (!response.ok) {
-        throw new Error('Symfony API returned HTTP ' + response.status);
+    let lastError = null;
+
+    for (const origin of origins) {
+        try {
+            const url = origin.replace(/\/$/, '') + '/api/voice/interpret';
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    text: text,
+                    language: language,
+                    browserContext: browserContext
+                })
+            });
+
+            const rawText = await response.text();
+
+            let data = null;
+
+            try {
+                data = rawText ? JSON.parse(rawText) : null;
+            } catch (error) {
+                throw new Error(
+                    'Symfony API returned non-JSON from ' +
+                    url +
+                    '. HTTP ' +
+                    response.status +
+                    '. Preview: ' +
+                    rawText.slice(0, 160)
+                );
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    data?.speech ||
+                    data?.message ||
+                    'Symfony API returned HTTP ' + response.status
+                );
+            }
+
+            assistantOrigin = origin;
+
+            return data;
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    return await response.json();
+    throw lastError || new Error('Could not contact Symfony voice API.');
 }
 
 async function executeBrowserAction(command) {
@@ -220,6 +353,11 @@ async function executeBrowserAction(command) {
         }
 
         lastActionMemory = action;
+
+        if (action === 'SEARCH' || action === 'OPEN_URL') {
+            await waitForTabLoad(tab.id);
+            await ensureContentScriptIfSupported(tab.id, url);
+        }
 
         if (command.nextAction && command.nextAction.action) {
             await waitForTabLoad(tab.id);
@@ -268,6 +406,72 @@ async function executeBrowserAction(command) {
     };
 }
 
+async function executeFrontendNavigation(url) {
+    const finalUrl = makeAbsoluteAssistantUrl(url);
+
+    if (assistantTabId) {
+        try {
+            const assistantTab = await chrome.tabs.get(assistantTabId);
+
+            if (assistantTab && assistantTab.id) {
+                const updatedTab = await chrome.tabs.update(assistantTab.id, {
+                    url: finalUrl,
+                    active: true
+                });
+
+                assistantTabId = updatedTab.id;
+
+                if (updatedTab.windowId) {
+                    await chrome.windows.update(updatedTab.windowId, {
+                        focused: true
+                    });
+                }
+
+                return {
+                    success: true,
+                    message: 'Opened the requested page.'
+                };
+            }
+        } catch (error) {
+            assistantTabId = null;
+        }
+    }
+
+    const existingAssistantTab = await findAssistantTab();
+
+    if (existingAssistantTab && existingAssistantTab.id) {
+        assistantTabId = existingAssistantTab.id;
+
+        const updatedTab = await chrome.tabs.update(existingAssistantTab.id, {
+            url: finalUrl,
+            active: true
+        });
+
+        if (updatedTab.windowId) {
+            await chrome.windows.update(updatedTab.windowId, {
+                focused: true
+            });
+        }
+
+        return {
+            success: true,
+            message: 'Opened the requested page.'
+        };
+    }
+
+    const createdTab = await chrome.tabs.create({
+        url: finalUrl,
+        active: true
+    });
+
+    assistantTabId = createdTab.id;
+
+    return {
+        success: true,
+        message: 'Opened the requested page.'
+    };
+}
+
 async function switchToAssistantTab() {
     if (assistantTabId) {
         try {
@@ -294,17 +498,7 @@ async function switchToAssistantTab() {
         }
     }
 
-    const tabs = await chrome.tabs.query({});
-
-    const assistantTab = tabs.find(tab => {
-        const url = tab.url || '';
-
-        return (
-            url.includes('127.0.0.1:8000') ||
-            url.includes('localhost:8000') ||
-            url.includes('voice-assistant.local')
-        );
-    });
+    const assistantTab = await findAssistantTab();
 
     if (assistantTab && assistantTab.id) {
         assistantTabId = assistantTab.id;
@@ -331,6 +525,26 @@ async function switchToAssistantTab() {
     };
 }
 
+async function findAssistantTab() {
+    const tabs = await chrome.tabs.query({});
+
+    const assistantTab = tabs.find(tab => {
+        const url = tab.url || '';
+
+        return isAssistantPage(url);
+    });
+
+    if (assistantTab && assistantTab.url) {
+        const origin = getOriginFromUrl(assistantTab.url);
+
+        if (origin) {
+            assistantOrigin = origin;
+        }
+    }
+
+    return assistantTab || null;
+}
+
 function buildMemoryContext(browserContext) {
     const websiteFromContext = detectWebsiteFromContext(browserContext);
 
@@ -342,7 +556,8 @@ function buildMemoryContext(browserContext) {
             activeWebsite: websiteFromContext || lastWebsiteMemory,
             lastSearchQuery: lastSearchQueryMemory,
             lastAction: lastActionMemory,
-            hasAssistantTab: assistantTabId !== null
+            hasAssistantTab: assistantTabId !== null,
+            assistantOrigin: assistantOrigin
         }
     };
 }
@@ -377,12 +592,54 @@ function normalizeAction(action) {
 
     const normalized = String(action).trim().toUpperCase();
 
-    if (normalized === 'OPEN' || normalized === 'OPEN-URL' || normalized === 'OPEN_URL') {
+    if (
+        normalized === 'OPEN' ||
+        normalized === 'OPEN-URL' ||
+        normalized === 'OPEN_URL' ||
+        normalized === 'OPEN_SITE' ||
+        normalized === 'OPEN_WEBSITE'
+    ) {
         return 'OPEN_URL';
     }
 
-    if (normalized === 'SEARCH_URL' || normalized === 'SEARCH-URL') {
+    if (
+        normalized === 'SEARCH_URL' ||
+        normalized === 'SEARCH-URL' ||
+        normalized === 'SEARCH_WEB'
+    ) {
         return 'SEARCH';
+    }
+
+    if (
+        normalized === 'OPEN_RESULT' ||
+        normalized === 'CLICK_RESULT' ||
+        normalized === 'SELECT'
+    ) {
+        return 'SELECT_RESULT';
+    }
+
+    if (normalized === 'BACK') {
+        return 'GO_BACK';
+    }
+
+    if (normalized === 'FORWARD') {
+        return 'GO_FORWARD';
+    }
+
+    if (normalized === 'PLAY') {
+        return 'PLAY_VIDEO';
+    }
+
+    if (normalized === 'PAUSE') {
+        return 'PAUSE_VIDEO';
+    }
+
+    if (normalized === 'READ') {
+        return 'READ_PAGE';
+    }
+
+    if (normalized === 'SUMMARIZE') {
+        return 'SUMMARIZE_PAGE';
     }
 
     return normalized;
@@ -391,7 +648,7 @@ function normalizeAction(action) {
 function buildUrlForCommand(command, action) {
     if (action === 'OPEN_URL') {
         if (command.url) {
-            return command.url;
+            return sanitizeExternalUrl(command.url);
         }
 
         const website = String(command.website || lastWebsiteMemory || '').toLowerCase();
@@ -413,9 +670,9 @@ function buildUrlForCommand(command, action) {
     }
 
     if (action === 'SEARCH') {
-        const rawQuery = command.query || '';
+        const rawQuery = String(command.query || '').trim();
 
-        if (!rawQuery.trim()) {
+        if (!rawQuery) {
             throw new Error('Search query is missing.');
         }
 
@@ -446,7 +703,11 @@ async function openOrReuseControlledTab(url) {
         try {
             const existingTab = await chrome.tabs.get(controlledTabId);
 
-            if (existingTab && existingTab.id) {
+            if (
+                existingTab &&
+                existingTab.id &&
+                isSupportedExternalPage(existingTab.url || '')
+            ) {
                 const updatedTab = await chrome.tabs.update(existingTab.id, {
                     url: url,
                     active: true
@@ -454,11 +715,30 @@ async function openOrReuseControlledTab(url) {
 
                 controlledTabId = updatedTab.id;
 
+                if (updatedTab.windowId) {
+                    await chrome.windows.update(updatedTab.windowId, {
+                        focused: true
+                    });
+                }
+
                 return updatedTab;
             }
         } catch (error) {
             controlledTabId = null;
         }
+    }
+
+    const activeExternalTab = await findActiveSupportedExternalTab();
+
+    if (activeExternalTab && activeExternalTab.id) {
+        const updatedTab = await chrome.tabs.update(activeExternalTab.id, {
+            url: url,
+            active: true
+        });
+
+        controlledTabId = updatedTab.id;
+
+        return updatedTab;
     }
 
     const createdTab = await chrome.tabs.create({
@@ -476,7 +756,11 @@ async function getControlledTab() {
         try {
             const tab = await chrome.tabs.get(controlledTabId);
 
-            if (tab && tab.id) {
+            if (
+                tab &&
+                tab.id &&
+                isSupportedExternalPage(tab.url || '')
+            ) {
                 return tab;
             }
         } catch (error) {
@@ -484,6 +768,28 @@ async function getControlledTab() {
         }
     }
 
+    const activeExternalTab = await findActiveSupportedExternalTab();
+
+    if (activeExternalTab && activeExternalTab.id) {
+        controlledTabId = activeExternalTab.id;
+
+        return activeExternalTab;
+    }
+
+    const tabs = await chrome.tabs.query({});
+
+    const supportedTab = tabs.find(tab => isSupportedExternalPage(tab.url || ''));
+
+    if (supportedTab && supportedTab.id) {
+        controlledTabId = supportedTab.id;
+
+        return supportedTab;
+    }
+
+    throw new Error('No supported browser tab found. Open YouTube, Google, Facebook, or Gmail first.');
+}
+
+async function findActiveSupportedExternalTab() {
     const tabs = await chrome.tabs.query({
         active: true,
         currentWindow: true
@@ -491,13 +797,15 @@ async function getControlledTab() {
 
     const activeTab = tabs[0];
 
-    if (!activeTab || !activeTab.id) {
-        throw new Error('No active or controlled browser tab found.');
+    if (
+        activeTab &&
+        activeTab.id &&
+        isSupportedExternalPage(activeTab.url || '')
+    ) {
+        return activeTab;
     }
 
-    controlledTabId = activeTab.id;
-
-    return activeTab;
+    return null;
 }
 
 function isSupportedExternalPage(url) {
@@ -509,6 +817,24 @@ function isSupportedExternalPage(url) {
         value.includes('facebook.com') ||
         value.includes('mail.google.com')
     );
+}
+
+function isAssistantPage(url) {
+    const value = String(url || '').toLowerCase();
+
+    return (
+        value.includes('localhost:8000') ||
+        value.includes('127.0.0.1:8000') ||
+        value.includes('voice-assistant.local')
+    );
+}
+
+async function ensureContentScriptIfSupported(tabId, url) {
+    if (!isSupportedExternalPage(url)) {
+        return;
+    }
+
+    await ensureContentScript(tabId);
 }
 
 async function ensureContentScript(tabId) {
@@ -527,29 +853,121 @@ async function ensureContentScript(tabId) {
 }
 
 function detectWebsiteFromContext(context) {
-    if (!context || !context.website) {
+    if (!context) {
         return null;
     }
 
-    const website = String(context.website).toLowerCase();
+    const website = String(context.website || '').toLowerCase();
+    const url = String(context.url || '').toLowerCase();
+    const source = website + ' ' + url;
 
-    if (website.includes('youtube.com')) {
+    if (source.includes('youtube.com') || source.includes('youtube')) {
         return 'youtube';
     }
 
-    if (website.includes('google.com')) {
-        return 'google';
-    }
-
-    if (website.includes('facebook.com')) {
-        return 'facebook';
-    }
-
-    if (website.includes('mail.google.com')) {
+    if (source.includes('mail.google.com') || source.includes('gmail')) {
         return 'gmail';
     }
 
+    if (source.includes('google.com') || source.includes('google')) {
+        return 'google';
+    }
+
+    if (source.includes('facebook.com') || source.includes('facebook')) {
+        return 'facebook';
+    }
+
     return null;
+}
+
+function sanitizeExternalUrl(url) {
+    const value = String(url || '').trim();
+
+    if (!value) {
+        throw new Error('URL is missing.');
+    }
+
+    let parsed;
+
+    try {
+        parsed = new URL(value);
+    } catch (error) {
+        throw new Error('Invalid URL.');
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    const allowedHosts = [
+        'youtube.com',
+        'www.youtube.com',
+        'google.com',
+        'www.google.com',
+        'facebook.com',
+        'www.facebook.com',
+        'mail.google.com'
+    ];
+
+    if (!allowedHosts.includes(hostname)) {
+        throw new Error('Unsupported external URL.');
+    }
+
+    return parsed.toString();
+}
+
+function makeAbsoluteAssistantUrl(url) {
+    const value = String(url || '').trim();
+
+    if (!value) {
+        return assistantOrigin;
+    }
+
+    try {
+        const parsed = new URL(value);
+
+        if (!isAssistantPage(parsed.toString())) {
+            return assistantOrigin;
+        }
+
+        const origin = getOriginFromUrl(parsed.toString());
+
+        if (origin) {
+            assistantOrigin = origin;
+        }
+
+        return parsed.toString();
+    } catch (error) {
+        if (value.startsWith('/')) {
+            return assistantOrigin.replace(/\/$/, '') + value;
+        }
+
+        return assistantOrigin.replace(/\/$/, '') + '/' + value.replace(/^\//, '');
+    }
+}
+
+function getOriginFromUrl(url) {
+    try {
+        const parsed = new URL(url);
+
+        return parsed.origin;
+    } catch (error) {
+        return null;
+    }
+}
+
+function getAssistantOriginsToTry() {
+    const origins = [];
+
+    if (assistantOrigin) {
+        origins.push(assistantOrigin);
+    }
+
+    for (const origin of FALLBACK_ASSISTANT_ORIGINS) {
+        if (!origins.includes(origin)) {
+            origins.push(origin);
+        }
+    }
+
+    return origins;
 }
 
 function sleep(milliseconds) {

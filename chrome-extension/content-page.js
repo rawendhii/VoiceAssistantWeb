@@ -1656,11 +1656,16 @@ function detectLocalPageCommand(text) {
 }
 
 function detectVideoNumberCommand(normalized) {
-    if (
-        !normalized.includes('video') &&
-        !normalized.includes('result') &&
-        !normalized.includes('number')
-    ) {
+    const hasVideoWord =
+        normalized.includes('video') ||
+        normalized.includes('vd') ||
+        normalized.includes('result');
+
+    const hasNumberWord =
+        normalized.includes('number') ||
+        /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|one|two|three|four|five|six|seven|eight|nine|ten|1st|2nd|2ns|3rd|4th|5th|6th|7th|8th|9th|10th|\d+)\b/.test(normalized);
+
+    if (!hasVideoWord && !hasNumberWord) {
         return null;
     }
 
@@ -1668,35 +1673,41 @@ function detectVideoNumberCommand(normalized) {
         !normalized.includes('open') &&
         !normalized.includes('play') &&
         !normalized.includes('select') &&
-        !normalized.includes('click')
+        !normalized.includes('click') &&
+        !normalized.includes('choose') &&
+        !normalized.includes('start')
     ) {
         return null;
     }
 
-    let match = normalized.match(/\b(?:video|result)\s+(?:number\s+)?(\d+)\b/);
+    const patterns = [
+        /\b(?:video|vd|result)\s+(?:number\s+)?(\d+)\b/,
+        /\b(?:video|vd|result)\s+(?:number\s+)?([a-z0-9]+)\b/,
+        /\bnumber\s+(\d+)\b/,
+        /\bnumber\s+([a-z0-9]+)\b/,
+        /\b(\d+)\s*(?:st|nd|ns|rd|th)?\s+(?:video|vd|result)\b/,
+        /\b([a-z0-9]+)\s+(?:video|vd|result)\b/
+    ];
 
-    if (match) {
-        const number = Number(match[1]);
-        return number > 0 ? number : null;
-    }
+    for (const pattern of patterns) {
+        const match = normalized.match(pattern);
 
-    match = normalized.match(/\bnumber\s+(\d+)\b/);
+        if (!match) {
+            continue;
+        }
 
-    if (match) {
-        const number = Number(match[1]);
-        return number > 0 ? number : null;
-    }
+        const value = String(match[1] || '').trim();
 
-    match = normalized.match(/\b(?:video|result)\s+(?:number\s+)?([a-z]+)\b/);
+        if (/^\d+$/.test(value)) {
+            const number = Number(value);
+            return number > 0 ? number : null;
+        }
 
-    if (match) {
-        return spokenNumberToInt(match[1]);
-    }
+        const number = spokenNumberToInt(value);
 
-    match = normalized.match(/\bnumber\s+([a-z]+)\b/);
-
-    if (match) {
-        return spokenNumberToInt(match[1]);
+        if (number !== null) {
+            return number;
+        }
     }
 
     return null;
@@ -1706,9 +1717,14 @@ function detectVideoTitleCommand(text) {
     const raw = String(text || '').trim();
 
     const patterns = [
-        /^(?:open|play|select|click)\s+(?:the\s+)?video\s+(?:called|named|titled|title)\s+(.+)$/i,
-        /^(?:open|play|select|click)\s+(?:the\s+)?(.+?)\s+video$/i
+        /^(?:open|play|select|click|choose|start)\s+(?:the\s+)?(?:video|vd)\s+(?:called|named|titled|title)\s+(.+)$/i,
+        /^(?:open|play|select|click|choose|start)\s+(?:the\s+)?(.+?)\s+(?:video|vd)$/i,
+        /^(?:open|play|select|click|choose|start)\s+(?:title|the title)\s+(.+)$/i
     ];
+
+    if (location.hostname.includes('youtube.com')) {
+        patterns.push(/^(?:open|play|select|click|choose|start)\s+(.+)$/i);
+    }
 
     for (const pattern of patterns) {
         const match = raw.match(pattern);
@@ -1726,8 +1742,27 @@ function detectVideoTitleCommand(text) {
         const normalizedTitle = normalizeExtensionText(title);
 
         if (
-            ['youtube', 'google', 'facebook', 'gmail', 'home', 'profile', 'files', 'settings'].includes(normalizedTitle)
+            [
+                'youtube',
+                'you tube',
+                'ytb',
+                'google',
+                'facebook',
+                'gmail',
+                'home',
+                'profile',
+                'files',
+                'settings',
+                'video',
+                'vd',
+                'result',
+                'number'
+            ].includes(normalizedTitle)
         ) {
+            continue;
+        }
+
+        if (/\b(number|first|second|third|one|two|three|four|five|six|seven|eight|nine|ten|1st|2nd|2ns|3rd|4th|5th|6th|7th|8th|9th|10th)\b/.test(normalizedTitle)) {
             continue;
         }
 
@@ -1741,30 +1776,60 @@ function spokenNumberToInt(word) {
     const normalized = normalizeExtensionText(word);
 
     const numbers = {
+        '1': 1,
+        '1st': 1,
         one: 1,
         first: 1,
         won: 1,
+
+        '2': 2,
+        '2nd': 2,
+        '2ns': 2,
         two: 2,
         second: 2,
         to: 2,
         too: 2,
+
+        '3': 3,
+        '3rd': 3,
         three: 3,
         third: 3,
         tree: 3,
+
+        '4': 4,
+        '4th': 4,
         four: 4,
         fourth: 4,
         for: 4,
+
+        '5': 5,
+        '5th': 5,
         five: 5,
         fifth: 5,
+
+        '6': 6,
+        '6th': 6,
         six: 6,
         sixth: 6,
+
+        '7': 7,
+        '7th': 7,
         seven: 7,
         seventh: 7,
+
+        '8': 8,
+        '8th': 8,
         eight: 8,
         eighth: 8,
         ate: 8,
+
+        '9': 9,
+        '9th': 9,
         nine: 9,
         ninth: 9,
+
+        '10': 10,
+        '10th': 10,
         ten: 10,
         tenth: 10
     };

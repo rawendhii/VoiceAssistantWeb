@@ -6,13 +6,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class GeminiChatService
 {
-    private HttpClientInterface $httpClient;
-    private string $geminiApiKey;
-
-    public function __construct(HttpClientInterface $httpClient, string $geminiApiKey)
-    {
-        $this->httpClient = $httpClient;
-        $this->geminiApiKey = $geminiApiKey;
+    public function __construct(
+        private readonly HttpClientInterface $httpClient,
+        private readonly string $geminiApiKey,
+        private readonly string $geminiModel = 'gemini-2.5-flash'
+    ) {
     }
 
     public function chat(string $text, string $language = 'en-US'): array
@@ -27,7 +25,7 @@ class GeminiChatService
             ];
         }
 
-        if ($this->geminiApiKey === '') {
+        if (trim($this->geminiApiKey) === '') {
             return [
                 'success' => false,
                 'message' => 'Gemini API key is missing. Please configure GEMINI_API_KEY in .env.local.',
@@ -36,50 +34,73 @@ class GeminiChatService
         }
 
         $prompt = <<<PROMPT
-You are Voice Assistant, an accessibility-focused chatbot integrated into a web and desktop project.
+You are Voice Assistant, an accessibility-focused chatbot integrated into a web and future JavaFX desktop project.
 
 The project helps people with disabilities, people with reduced mobility, people with visual limitations, and users who need hands-free digital support.
 
-Answer like a helpful, clear, friendly assistant.
-Keep the answer short and useful.
-Answer in the same language as the user when possible.
+Important:
+- Answer normal questions naturally and helpfully.
+- You are not the executor.
+- Do not claim that you personally executed actions.
+- Do not say external website control is impossible when the app supports it.
+- If the user asks about supported actions, explain briefly that the secure executor handles actions.
+- Do not invent pages that may not exist.
+- Do not tell the user to open Settings, Security, Account Management, or Delete Account unless the app has that page.
+- Keep the answer short, clear, friendly, and accessible.
+- Answer in the same language as the user when possible.
 
 User language: {$language}
-User message: {$text}
+
+User message:
+{$text}
 PROMPT;
 
         try {
-            $response = $this->httpClient->request(
-                'POST',
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
-                [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                        'x-goog-api-key' => $this->geminiApiKey,
-                    ],
-                    'json' => [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    [
-                                        'text' => $prompt,
-                                    ],
+            $url = sprintf(
+                'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s',
+                rawurlencode($this->geminiModel),
+                rawurlencode($this->geminiApiKey)
+            );
+
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => [
+                    'contents' => [
+                        [
+                            'role' => 'user',
+                            'parts' => [
+                                [
+                                    'text' => $prompt,
                                 ],
                             ],
                         ],
-                        'generationConfig' => [
-                            'temperature' => 0.4,
-                            'maxOutputTokens' => 500,
-                        ],
                     ],
-                ]
-            );
+                    'generationConfig' => [
+                        'temperature' => 0.4,
+                        'topP' => 0.8,
+                        'topK' => 40,
+                        'maxOutputTokens' => 500,
+                    ],
+                ],
+            ]);
 
+            $statusCode = $response->getStatusCode();
             $data = $response->toArray(false);
+
+            if ($statusCode < 200 || $statusCode >= 300) {
+                return [
+                    'success' => false,
+                    'message' => 'Gemini chat returned HTTP ' . $statusCode,
+                    'speech' => 'Gemini chat is not available right now.',
+                    'raw' => $data,
+                ];
+            }
 
             $answer = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
-            if ($answer === '') {
+            if (!is_string($answer) || trim($answer) === '') {
                 return [
                     'success' => false,
                     'message' => 'Gemini returned an empty response.',
@@ -88,11 +109,15 @@ PROMPT;
                 ];
             }
 
+            $answer = trim($answer);
+
             return [
                 'success' => true,
                 'intent' => 'CHAT',
-                'message' => trim($answer),
-                'speech' => trim($answer),
+                'mode' => 'GEMINI_CHAT',
+                'requiresExtension' => false,
+                'message' => $answer,
+                'speech' => $answer,
             ];
         } catch (\Throwable $exception) {
             return [
