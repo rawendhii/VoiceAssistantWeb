@@ -11,6 +11,13 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class GoogleOAuthController extends AbstractController
 {
+    public function __construct(
+        private readonly string $googleClientId,
+        private readonly string $googleClientSecret,
+        private readonly string $googleRedirectUri
+    ) {
+    }
+
     #[Route('/google/oauth/connect', name: 'google_oauth_connect', methods: ['GET'])]
     public function connect(): RedirectResponse
     {
@@ -52,9 +59,9 @@ class GoogleOAuthController extends AbstractController
     private function createGoogleClient(): GoogleClient
     {
         $client = new GoogleClient();
-        $client->setClientId($_ENV['GOOGLE_CLIENT_ID'] ?? '');
-        $client->setClientSecret($_ENV['GOOGLE_CLIENT_SECRET'] ?? '');
-        $client->setRedirectUri($_ENV['GOOGLE_REDIRECT_URI'] ?? 'http://127.0.0.1:8000/google/oauth/callback');
+        $client->setClientId($this->googleClientId);
+        $client->setClientSecret($this->googleClientSecret);
+        $client->setRedirectUri($this->googleRedirectUri);
         $client->setAccessType('offline');
         $client->setPrompt('consent');
         $client->addScope('https://www.googleapis.com/auth/gmail.send');

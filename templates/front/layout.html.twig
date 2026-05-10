@@ -765,10 +765,8 @@
             const globalVoiceAssistant = document.getElementById('globalVoiceAssistant');
 
             /*
-             * The dedicated Voice Commands page has its own microphone button,
-             * keyboard listener, extension bridge, and status UI.
-             * Returning here prevents two SpeechRecognition instances from
-             * starting at the same time when Space is pressed on that page.
+             * The dedicated Voice Assistant page has its own microphone UI.
+             * Hide this small global widget there to avoid two microphones running together.
              */
             if (document.querySelector('.voice-page')) {
                 if (globalVoiceAssistant) {
@@ -783,9 +781,7 @@
             }
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
             const VOICE_LANGUAGE_STORAGE_KEY = 'voiceAssistantLanguage';
-            const VOICE_PENDING_FLOW_STORAGE_KEY = 'voiceAssistantPendingFlow';
 
             const SUPPORTED_VOICE_LANGUAGES = {
                 english: 'en-US',
@@ -817,8 +813,10 @@
 
             let recognition = null;
             let isListening = false;
+            let isRecognitionStarting = false;
             let hasSpeechSupport = !!SpeechRecognition;
             let extensionReady = false;
+            let lastKnownControlledWebsite = null;
 
             let lastBrowserContext = {
                 url: null,
@@ -832,6 +830,7 @@
                     .toLowerCase()
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
                     .replace(/\s+/g, ' ')
                     .trim();
             }
@@ -846,6 +845,12 @@
                 if (recognition) {
                     recognition.lang = language;
                 }
+
+                window.postMessage({
+                    source: 'VOICE_ASSISTANT_WEB',
+                    type: 'VOICE_LANGUAGE_CHANGED',
+                    language: language
+                }, window.location.origin);
             }
 
             function getCurrentVoiceLanguage() {
@@ -890,6 +895,7 @@
                     'use ',
                     'talk in ',
                     'answer in ',
+                    'switch to ',
 
                     'parle ',
                     'reponds en ',
@@ -897,12 +903,14 @@
                     'changer la langue en ',
                     'change la langue en ',
                     'utilise ',
+                    'passe en ',
 
                     'تكلم ',
                     'احكي ',
                     'جاوبني ب ',
                     'بدل اللغة إلى ',
-                    'بدل اللغة ل '
+                    'بدل اللغة ل ',
+                    'استعمل '
                 ];
 
                 for (const pattern of languagePatterns) {
@@ -910,7 +918,7 @@
                         const afterPattern = normalized.split(pattern).pop().trim();
 
                         for (const languageName in SUPPORTED_VOICE_LANGUAGES) {
-                            if (afterPattern.includes(languageName)) {
+                            if (afterPattern.includes(normalizeText(languageName))) {
                                 return SUPPORTED_VOICE_LANGUAGES[languageName];
                             }
                         }
@@ -932,6 +940,27 @@
                     tagName === 'textarea' ||
                     tagName === 'select' ||
                     target.isContentEditable
+                );
+            }
+
+            function isHelpCommand(text) {
+                const normalized = normalizeText(text);
+
+                return (
+                    normalized === 'help' ||
+                    normalized === 'voice help' ||
+                    normalized === 'show commands' ||
+                    normalized === 'available commands' ||
+                    normalized === 'what can i say' ||
+                    normalized === 'what can i do' ||
+                    normalized.includes('what can i say') ||
+                    normalized.includes('show me commands') ||
+                    normalized.includes('help me') ||
+                    normalized === 'aide' ||
+                    normalized.includes('que puis je dire') ||
+                    normalized.includes('qu est ce que je peux dire') ||
+                    normalized.includes('شنوة نجم نقول') ||
+                    normalized.includes('مساعدة')
                 );
             }
 
@@ -978,7 +1007,7 @@
                 }
 
                 if (state === 'processing') {
-                    voiceBadge.textContent = 'Work';
+                    voiceBadge.textContent = 'Think';
                     voiceBadge.classList.add('processing');
                     voiceButton.textContent = 'Start';
                     voiceButton.setAttribute('aria-pressed', 'false');
@@ -992,6 +1021,7 @@
                     voiceButton.textContent = 'Start';
                     voiceButton.setAttribute('aria-pressed', 'false');
                     isListening = false;
+                    isRecognitionStarting = false;
                     return;
                 }
 
@@ -999,6 +1029,7 @@
                 voiceButton.textContent = 'Start';
                 voiceButton.setAttribute('aria-pressed', 'false');
                 isListening = false;
+                isRecognitionStarting = false;
             }
 
             function setAssistantResult(text, speak = true, state = 'idle') {
@@ -1010,218 +1041,6 @@
                 }
             }
 
-
-            function setPendingVoiceFlow(flow) {
-                if (flow) {
-                    localStorage.setItem(VOICE_PENDING_FLOW_STORAGE_KEY, flow);
-                    return;
-                }
-
-                localStorage.removeItem(VOICE_PENDING_FLOW_STORAGE_KEY);
-            }
-
-            function getPendingVoiceFlow() {
-                return localStorage.getItem(VOICE_PENDING_FLOW_STORAGE_KEY) || '';
-            }
-
-            function updatePendingVoiceFlowFromResponse(data) {
-                if (!data || data.intent !== 'EMAIL_ACTION') {
-                    return;
-                }
-
-                if (data.mode === 'EMAIL_MISSING_BODY' || data.requiresEmailBody) {
-                    setPendingVoiceFlow('EMAIL_BODY');
-                    return;
-                }
-
-                if (data.mode === 'EMAIL_PREPARED_NEEDS_CONFIRMATION' || data.requiresConfirmation) {
-                    setPendingVoiceFlow('EMAIL_CONFIRMATION');
-                    return;
-                }
-
-                if (
-                    data.mode === 'EMAIL_SEND_CONFIRMED' ||
-                    data.mode === 'EMAIL_CANCELLED' ||
-                    data.mode === 'EMAIL_NO_PENDING_MESSAGE'
-                ) {
-                    setPendingVoiceFlow(null);
-                }
-            }
-
-            function looksLikeEmailConfirmationCommand(text) {
-                const normalized = normalizeText(text);
-
-                return (
-                    normalized === 'confirm' ||
-                    normalized === 'i confirm' ||
-                    normalized === 'send it' ||
-                    normalized.includes('confirm send email') ||
-                    normalized.includes('send the pending email') ||
-                    normalized.includes('yes send it') ||
-                    normalized.includes('confirm it') ||
-                    normalized.includes('i confirm send it') ||
-                    normalized.includes('confirm send it') ||
-                    normalized.includes('send it now') ||
-                    normalized.includes('confirme l envoi') ||
-                    normalized.includes('confirmer l envoi') ||
-                    normalized.includes('ارسل الرسالة') ||
-                    normalized.includes('ابعث الرسالة')
-                );
-            }
-
-            function looksLikeEmailCancellationCommand(text) {
-                const normalized = normalizeText(text);
-
-                return (
-                    normalized.includes('cancel') ||
-                    normalized.includes('do not send') ||
-                    normalized.includes("don't send") ||
-                    normalized.includes('dont send') ||
-                    normalized.includes('not confirming') ||
-                    normalized.includes('no confirm') ||
-                    normalized.includes('stop email') ||
-                    normalized.includes('annuler') ||
-                    normalized.includes('ne pas envoyer') ||
-                    normalized.includes('الغاء') ||
-                    normalized.includes('إلغاء') ||
-                    normalized.includes('لا ترسل')
-                );
-            }
-
-            function isHelpCommand(text) {
-                const normalized = normalizeText(text);
-
-                return (
-                    normalized === 'help' ||
-                    normalized === 'voice help' ||
-                    normalized === 'show commands' ||
-                    normalized === 'available commands' ||
-                    normalized === 'what can i say' ||
-                    normalized === 'what can i do' ||
-                    normalized.includes('what can i say') ||
-                    normalized.includes('show me commands') ||
-                    normalized.includes('help me') ||
-                    normalized === 'aide' ||
-                    normalized.includes('que puis je dire') ||
-                    normalized.includes('qu est ce que je peux dire') ||
-                    normalized.includes('شنوة نجم نقول') ||
-                    normalized.includes('مساعدة')
-                );
-            }
-
-            function looksLikeAiCommand(text) {
-                const normalized = normalizeText(text);
-
-                return (
-                    normalized.includes('youtube') ||
-                    normalized.includes('google') ||
-                    normalized.includes('facebook') ||
-                    normalized.includes('gmail') ||
-                    normalized.includes('mail') ||
-
-                    normalized.includes('search') ||
-                    normalized.includes('find') ||
-                    normalized.includes('look for') ||
-                    normalized.includes('open result') ||
-                    normalized.includes('open the result') ||
-                    normalized.includes('go to') ||
-                    normalized.includes('open website') ||
-                    normalized.includes('open ') ||
-
-                    normalized.includes('send email') ||
-                    normalized.includes('send an email') ||
-                    normalized.includes('write email') ||
-                    normalized.includes('write an email') ||
-                    normalized.includes('compose email') ||
-                    normalized.includes('compose an email') ||
-                    normalized.startsWith('email ') ||
-                    normalized.includes(' email ') ||
-                    normalized.includes('confirm send email') ||
-                    normalized.includes('send the pending email') ||
-                    normalized.includes('yes send it') ||
-                    normalized.includes('confirm it') ||
-                    looksLikeEmailConfirmationCommand(normalized) ||
-                    looksLikeEmailCancellationCommand(normalized) ||
-
-                    normalized.includes('video') ||
-                    normalized.includes('play') ||
-                    normalized.includes('pause') ||
-                    normalized.includes('mute') ||
-                    normalized.includes('unmute') ||
-                    normalized.includes('scroll') ||
-                    normalized.includes('read this page') ||
-                    normalized.includes('read page') ||
-                    normalized.includes('click') ||
-                    normalized.includes('go back') ||
-                    normalized.includes('go forward') ||
-                    normalized.includes('second') ||
-                    normalized.includes('third') ||
-                    normalized.includes('first result') ||
-                    normalized.includes('take me back') ||
-                    normalized.includes('back to assistant') ||
-                    normalized.includes('return to assistant') ||
-                    normalized.includes('voice assistant') ||
-
-                    normalized.includes('cherche') ||
-                    normalized.includes('recherche') ||
-                    normalized.includes('trouve') ||
-                    normalized.includes('chercher') ||
-                    normalized.includes('email') ||
-                    normalized.includes('e-mail') ||
-                    normalized.includes('envoyer un email') ||
-                    normalized.includes('envoie un email') ||
-                    normalized.includes('ecris un email') ||
-                    normalized.includes('ecrire un email') ||
-                    normalized.includes('confirme l envoi') ||
-                    normalized.includes('confirmer l envoi') ||
-                    normalized.includes('video') ||
-                    normalized.includes('joue') ||
-                    normalized.includes('lance') ||
-                    normalized.includes('mets') ||
-                    normalized.includes('lis cette page') ||
-                    normalized.includes('lire cette page') ||
-                    normalized.includes('descends') ||
-                    normalized.includes('descendre') ||
-                    normalized.includes('monte') ||
-                    normalized.includes('clique') ||
-                    normalized.includes('retour') ||
-                    normalized.includes('deuxieme') ||
-                    normalized.includes('troisieme') ||
-                    normalized.includes('premier resultat') ||
-
-                    normalized.includes('جيميل') ||
-                    normalized.includes('جميل') ||
-                    normalized.includes('ايميل') ||
-                    normalized.includes('إيميل') ||
-                    normalized.includes('ابعث ايميل') ||
-                    normalized.includes('ارسل ايميل') ||
-                    normalized.includes('ابعت ايميل') ||
-                    normalized.includes('اكتب ايميل') ||
-                    normalized.includes('ابحث') ||
-                    normalized.includes('فتش') ||
-                    normalized.includes('دور') ||
-                    normalized.includes('فيديو') ||
-                    normalized.includes('شغل') ||
-                    normalized.includes('وقف') ||
-                    normalized.includes('اقرأ') ||
-                    normalized.includes('انزل') ||
-                    normalized.includes('اطلع') ||
-                    normalized.includes('اضغط') ||
-                    normalized.includes('ارجع') ||
-                    normalized.includes('الثاني') ||
-                    normalized.includes('الثالث') ||
-                    normalized.includes('الأول')
-                );
-            }
-
-            function sendCommandToChromeExtension(command) {
-                window.postMessage({
-                    source: 'VOICE_ASSISTANT_WEB',
-                    type: 'EXECUTE_BROWSER_ACTION',
-                    command: command
-                }, window.location.origin);
-            }
-
             function updateBrowserContext(context) {
                 lastBrowserContext = {
                     url: context.url || null,
@@ -1229,17 +1048,56 @@
                     website: context.website || null,
                     visibleText: context.visibleText || null
                 };
+
+                const website = String(lastBrowserContext.website || '').toLowerCase();
+                const url = String(lastBrowserContext.url || '').toLowerCase();
+                const source = website + ' ' + url;
+
+                if (source.includes('youtube')) {
+                    lastKnownControlledWebsite = 'youtube';
+                } else if (source.includes('google')) {
+                    lastKnownControlledWebsite = 'google';
+                } else if (source.includes('facebook')) {
+                    lastKnownControlledWebsite = 'facebook';
+                } else if (source.includes('gmail') || source.includes('mail.google.com')) {
+                    lastKnownControlledWebsite = 'gmail';
+                }
             }
 
-            function checkExtensionConnection() {
+            function buildBrowserContextForApi() {
+                const context = {
+                    url: lastBrowserContext.url,
+                    title: lastBrowserContext.title,
+                    website: lastBrowserContext.website,
+                    visibleText: lastBrowserContext.visibleText
+                };
+
+                /*
+                 * Important:
+                 * After "open ytb", the user may immediately say "search for cats".
+                 * The extension may not have sent the YouTube context yet, so we keep
+                 * a safe fallback website value.
+                 */
+                if (!context.website && lastKnownControlledWebsite) {
+                    context.website = lastKnownControlledWebsite;
+                }
+
+                return context;
+            }
+
+            function requestBrowserContext() {
                 window.postMessage({
                     source: 'VOICE_ASSISTANT_WEB',
                     type: 'PING_EXTENSION'
                 }, window.location.origin);
+            }
+
+            function checkExtensionConnection() {
+                requestBrowserContext();
 
                 setTimeout(function () {
                     if (!extensionReady) {
-                        setVoiceState('idle', 'Extension not connected');
+                        setVoiceState('idle', 'Gemini ready; extension not connected');
                     }
                 }, 1500);
             }
@@ -1251,107 +1109,173 @@
 
                 if (event.data.type === 'EXTENSION_READY') {
                     extensionReady = true;
-                    setVoiceState('idle', 'Press Space to speak');
+                    setVoiceState('idle', 'Gemini executor ready');
+                    return;
                 }
 
                 if (event.data.type === 'BROWSER_CONTEXT') {
                     updateBrowserContext(event.data.context || {});
+                    return;
                 }
 
                 if (event.data.type === 'BROWSER_ACTION_RESULT') {
                     const result = event.data.result || {};
                     const message = result.message || 'Browser action completed.';
 
+                    if (result.context) {
+                        updateBrowserContext(result.context);
+                    }
+
                     setAssistantResult(message, true, result.success === false ? 'error' : 'idle');
+
+                    setTimeout(requestBrowserContext, 500);
+                    setTimeout(requestBrowserContext, 1200);
                 }
             });
 
-            function executeWebsiteAction(data) {
-                const action = String(data.action || '').toLowerCase();
-                const extensionAction = action === 'search' ? 'SEARCH' : 'OPEN_URL';
+            function executeVoiceActionWithExtension(apiResult) {
+                if (!apiResult || !apiResult.extensionCommand) {
+                    return;
+                }
 
-                const command = data.extensionCommand || {
-                    action: extensionAction,
-                    website: data.website || null,
-                    websiteName: data.websiteName || data.website || null,
-                    url: data.url || null,
-                    query: data.query || null,
-                    target: null,
-                    resultPosition: data.resultPosition || null,
-                    nextAction: data.nextAction || null,
-                    language: getCurrentVoiceLanguage(),
-                    context: lastBrowserContext
-                };
+                if (apiResult.website) {
+                    lastKnownControlledWebsite = apiResult.website;
+                }
 
-                const websiteName = data.websiteName || data.website || 'the website';
-                const queryText = data.query ? ' for "' + data.query + '"' : '';
-                const message = action === 'search'
-                    ? 'Searching ' + websiteName + queryText + ' in the controlled browser tab.'
-                    : 'Opening ' + websiteName + ' in the controlled browser tab.';
+                if (!extensionReady) {
+                    setAssistantResult(
+                        'I understood the command, but the Chrome extension is not connected. Please enable the extension and reload this page.',
+                        true,
+                        'error'
+                    );
+                    return;
+                }
 
-                setAssistantResult(data.speech || data.message || message, true, 'idle');
-                sendCommandToChromeExtension(command);
+                window.postMessage({
+                    source: 'VOICE_ASSISTANT_WEB',
+                    type: 'EXECUTE_BROWSER_ACTION',
+                    command: apiResult.extensionCommand
+                }, window.location.origin);
+
+                setAssistantResult(
+                    'Executor is running the command.',
+                    false,
+                    'processing'
+                );
             }
 
-            function handleEmailAction(data) {
-                let message = data.speech || data.message || 'Email action completed.';
+            function handleVoiceApiResponse(data) {
+                console.log('GLOBAL VOICE API RESPONSE:', data);
 
-                if (data.emailPreview) {
-                    message += '\n\nEmail preview:\n';
-                    message += 'To: ' + (data.emailPreview.to || '') + '\n';
-                    message += 'Subject: ' + (data.emailPreview.subject || '') + '\n';
-                    message += 'Body: ' + (data.emailPreview.body || '');
-                }
+                if (!data || data.success === false) {
+                    const errorMessage =
+                        (data && (data.speech || data.message)) ||
+                        'Gemini could not safely understand that command. Please try again.';
 
-                if (data.connectUrl) {
-                    message += '\n\nGmail connection required. Open: ' + data.connectUrl;
-                }
-
-                setAssistantResult(message, true, data.success === false ? 'error' : 'idle');
-            }
-
-            function handleVoiceResponse(data) {
-                console.log('GLOBAL VOICE RESPONSE:', data);
-
-                if (data.intent === 'EMAIL_ACTION') {
-                    updatePendingVoiceFlowFromResponse(data);
-                    handleEmailAction(data);
+                    setAssistantResult(errorMessage, true, 'error');
                     return;
                 }
 
-                if (data.success && data.intent === 'WEBSITE_ACTION') {
-                    executeWebsiteAction(data);
-                    return;
+                if (data.website) {
+                    lastKnownControlledWebsite = data.website;
                 }
 
-                if (data.success && data.intent === 'BROWSER_ACTION' && data.requiresExtension && data.extensionCommand) {
-                    setAssistantResult(data.speech || data.message || 'Executing browser action.', true, 'idle');
-                    sendCommandToChromeExtension(data.extensionCommand);
-                    return;
-                }
-
-                if (!data.success) {
-                    const failMessage =
-                        (data.speech || data.message || 'I could not match that command.') +
-                        ' Try saying "what can I say" for help.';
-
-                    setAssistantResult(failMessage, true, 'error');
-                    return;
-                }
-
-                const spokenReply =
-                    (data.execution && data.execution.speech) ||
+                const reply =
                     data.speech ||
                     data.message ||
-                    'Command completed successfully.';
+                    'I understood the command.';
 
-                setAssistantResult(spokenReply, true, 'idle');
+                /*
+                 * Internal Symfony navigation:
+                 * home, profile, files, change password, logout, Gmail connect, etc.
+                 */
+                if (
+                    data.frontendAction &&
+                    data.frontendAction.type === 'NAVIGATE' &&
+                    data.frontendAction.url
+                ) {
+                    setAssistantResult(reply, true, 'processing');
 
-                if (data.execution && data.execution.redirect) {
                     setTimeout(function () {
-                        window.location.href = data.execution.redirect;
-                    }, 1400);
+                        window.location.href = data.frontendAction.url;
+                    }, 450);
+
+                    return;
                 }
+
+                /*
+                 * Scroll inside this Voice Assistant web app.
+                 * Do not send app scroll commands to the Chrome extension.
+                 */
+                if (
+                    window.location.pathname.startsWith('/front') &&
+                    data.intent === 'BROWSER_ACTION' &&
+                    (data.action === 'SCROLL_DOWN' || data.action === 'SCROLL_UP')
+                ) {
+                    const direction = data.action === 'SCROLL_DOWN' ? 'down' : 'up';
+
+                    setAssistantResult(reply, true, 'processing');
+
+                    setTimeout(function () {
+                        scrollVoiceAssistantPage(direction);
+                        setAssistantResult(
+                            direction === 'down' ? 'Scrolled down.' : 'Scrolled up.',
+                            true,
+                            'idle'
+                        );
+                    }, 250);
+
+                    return;
+                }
+
+                setAssistantResult(reply, true, data.requiresExtension ? 'processing' : 'idle');
+
+                if (data.requiresExtension && data.extensionCommand) {
+                    executeVoiceActionWithExtension(data);
+                }
+            }
+
+            function scrollVoiceAssistantPage(direction) {
+                const amount = Math.max(420, Math.round(window.innerHeight * 0.82));
+                const delta = direction === 'down' ? amount : -amount;
+
+                const candidates = [
+                    document.querySelector('.front-content'),
+                    document.querySelector('.front-main'),
+                    document.querySelector('main'),
+                    document.scrollingElement,
+                    document.documentElement,
+                    document.body
+                ].filter(Boolean);
+
+                let bestTarget = null;
+
+                for (const element of candidates) {
+                    if (
+                        element.scrollHeight &&
+                        element.clientHeight &&
+                        element.scrollHeight > element.clientHeight + 8
+                    ) {
+                        bestTarget = element;
+                        break;
+                    }
+                }
+
+                if (!bestTarget || bestTarget === document.documentElement || bestTarget === document.body) {
+                    window.scrollBy({
+                        top: delta,
+                        left: 0,
+                        behavior: 'smooth'
+                    });
+
+                    return;
+                }
+
+                bestTarget.scrollBy({
+                    top: delta,
+                    left: 0,
+                    behavior: 'smooth'
+                });
             }
 
             function sendGlobalVoiceCommand(text) {
@@ -1365,21 +1289,17 @@
 
                 if (isHelpCommand(text)) {
                     const helpMessage =
-                        'Here are some commands you can say: open profile, show my files, go home, log out, open YouTube, search YouTube for cats, open the second video, pause the video, read this page, scroll down, go to Gmail, send an email to john@example.com saying hello, or confirm send email.';
+                        'Voice assistant is ready. You can say: open YouTube, open ytb, search YouTube for cats, search for cats, open my profile, show my files, connect Gmail, send an email, scroll down, scroll up, go back, pause video, play video, mute, unmute, or open result number two.';
 
                     setAssistantResult(helpMessage, true, 'idle');
                     return;
                 }
 
-                const shouldUseAiEndpoint = getPendingVoiceFlow() !== '' || looksLikeAiCommand(text) || looksLikeEmailCancellationCommand(text);
+                const endpoint = '{{ path('api_voice_interpret') }}';
 
-                const endpoint = shouldUseAiEndpoint
-                    ? '{{ path('api_voice_interpret') }}'
-                    : '{{ path('voice_execute') }}';
+                console.log('GLOBAL VOICE EXECUTOR ENDPOINT:', endpoint);
 
-                console.log('GLOBAL VOICE ENDPOINT:', endpoint);
-
-                setAssistantResult('Processing your command: ' + text, false, 'processing');
+                setAssistantResult('Interpreting: ' + text, false, 'processing');
 
                 fetch(endpoint, {
                     method: 'POST',
@@ -1390,16 +1310,41 @@
                     body: JSON.stringify({
                         text: text,
                         language: getCurrentVoiceLanguage(),
-                        browserContext: lastBrowserContext
+                        browserContext: buildBrowserContextForApi()
                     })
                 })
                     .then(function (response) {
-                        return response.json();
+                        return response.text().then(function (rawText) {
+                            let data = null;
+
+                            try {
+                                data = rawText ? JSON.parse(rawText) : null;
+                            } catch (error) {
+                                throw new Error(
+                                    'The voice API returned a non-JSON response. HTTP ' +
+                                    response.status +
+                                    '. Response preview: ' +
+                                    rawText.slice(0, 160)
+                                );
+                            }
+
+                            if (!response.ok) {
+                                const message =
+                                    (data && (data.speech || data.message)) ||
+                                    'The voice API returned HTTP ' + response.status + '.';
+
+                                throw new Error(message);
+                            }
+
+                            return data;
+                        });
                     })
-                    .then(handleVoiceResponse)
-                    .catch(function () {
+                    .then(handleVoiceApiResponse)
+                    .catch(function (error) {
+                        console.error('GLOBAL VOICE API CONNECTION ERROR:', error);
+
                         setAssistantResult(
-                            'A connection error happened while processing your command. Please check the server and try again.',
+                            error.message || 'A connection error happened while contacting the voice executor API. Please check the server and try again.',
                             true,
                             'error'
                         );
@@ -1412,7 +1357,15 @@
                 }
 
                 if (!hasSpeechSupport) {
-                    setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', true, 'error');
+                    setAssistantResult(
+                        'Voice recognition is not supported in this browser. Please use Google Chrome.',
+                        true,
+                        'error'
+                    );
+                    return;
+                }
+
+                if (isListening || isRecognitionStarting) {
                     return;
                 }
 
@@ -1422,17 +1375,22 @@
                     recognition.continuous = false;
 
                     recognition.onstart = function () {
-                        setVoiceState('listening', 'Listening now. Speak your command.');
-                        announceText('Listening now. Speak your command.');
+                        isRecognitionStarting = false;
+                        setVoiceState('listening', 'Listening now. Speak naturally.');
+                        announceText('Listening now. Speak naturally.');
                     };
 
                     recognition.onend = function () {
+                        isRecognitionStarting = false;
+
                         if (isListening) {
                             setVoiceState('idle', 'Press Space to speak');
                         }
                     };
 
                     recognition.onerror = function (event) {
+                        isRecognitionStarting = false;
+
                         console.error('SPEECH RECOGNITION ERROR:', event.error, event);
 
                         let message = 'Voice recognition error: ' + event.error + '. Please try again.';
@@ -1440,7 +1398,7 @@
                         if (event.error === 'not-allowed') {
                             message = 'Microphone permission was denied. Please allow microphone access and try again.';
                         } else if (event.error === 'no-speech') {
-                            message = 'I did not hear anything. Press Space or Start and speak your command.';
+                            message = 'I did not hear anything. Press Space or Start and speak again.';
                         } else if (event.error === 'audio-capture') {
                             message = 'No microphone was found. Please check your microphone.';
                         } else if (event.error === 'network') {
@@ -1457,23 +1415,35 @@
                     recognition.onresult = function (event) {
                         const text = event.results[0][0].transcript.trim();
 
-                        setVoiceState('processing', 'Processing: ' + text);
+                        setVoiceState('processing', 'Interpreting: ' + text);
                         sendGlobalVoiceCommand(text);
                     };
                 }
 
                 try {
                     recognition.lang = getCurrentVoiceLanguage();
+                    isRecognitionStarting = true;
                     recognition.start();
                 } catch (error) {
-                    setAssistantResult('The microphone is already starting. Please wait a moment.', true, 'error');
+                    isRecognitionStarting = false;
+
+                    setAssistantResult(
+                        'The microphone is already starting. Please wait a moment.',
+                        true,
+                        'error'
+                    );
                 }
             }
 
             function stopListening() {
                 if (recognition && isListening) {
                     recognition.stop();
-                    setAssistantResult('Listening stopped. Press Space when you want to speak again.', true, 'idle');
+
+                    setAssistantResult(
+                        'Listening stopped. Press Space when you want to speak again.',
+                        true,
+                        'idle'
+                    );
                 }
             }
 
@@ -1490,7 +1460,13 @@
             });
 
             document.addEventListener('keydown', function (event) {
-                if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+                if (
+                    event.code === 'Space' &&
+                    !event.ctrlKey &&
+                    !event.altKey &&
+                    !event.shiftKey &&
+                    !event.metaKey
+                ) {
                     if (isTypingTarget(event.target)) {
                         return;
                     }
@@ -1538,9 +1514,13 @@
             saveVoiceLanguage(getSavedVoiceLanguage());
 
             if (!hasSpeechSupport) {
-                setAssistantResult('Voice recognition is not supported in this browser. Please use Google Chrome.', false, 'error');
+                setAssistantResult(
+                    'Voice recognition is not supported in this browser. Please use Google Chrome.',
+                    false,
+                    'error'
+                );
             } else {
-                setVoiceState('idle', 'Press Space to speak');
+                setVoiceState('idle', 'Gemini executor ready');
             }
 
             checkExtensionConnection();

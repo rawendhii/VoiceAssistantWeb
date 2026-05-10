@@ -12,12 +12,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    if (message.type === 'VOICE_LANGUAGE_CHANGED') {
+        setExtensionVoiceLanguage(message.language || 'en-US', true);
+
+        sendResponse({
+            success: true,
+            message: 'Voice language changed on page.',
+            language: getCurrentExtensionVoiceLanguage()
+        });
+
+        return true;
+    }
+
     if (message.type === 'RUN_PAGE_ACTION') {
         runPageAction(message.command || {})
             .then(result => sendResponse(result))
             .catch(error => sendResponse({
                 success: false,
-                message: error.message
+                message: error.message || 'Page action failed.'
             }));
 
         return true;
@@ -30,7 +42,7 @@ async function runPageAction(command) {
 
     switch (action) {
         case 'SELECT_RESULT':
-            return await selectResult(command.resultPosition);
+            return await selectResult(command.resultPosition, language);
 
         case 'READ_PAGE':
             return readPage(language);
@@ -39,12 +51,10 @@ async function runPageAction(command) {
             return summarizePage(language);
 
         case 'SCROLL_DOWN':
-            window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-            return { success: true, message: getActionMessage('SCROLL_DOWN', language) };
+            return scrollPage('down', language);
 
         case 'SCROLL_UP':
-            window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
-            return { success: true, message: getActionMessage('SCROLL_UP', language) };
+            return scrollPage('up', language);
 
         case 'GO_BACK':
             history.back();
@@ -72,12 +82,13 @@ async function runPageAction(command) {
         case 'VOLUME_DOWN':
             return changeVolume(-0.1, language);
 
-       case 'CLICK':
-    if (location.hostname.includes('youtube.com')) {
-        return await clickYouTubeVideoByTitle(command.target, language);
-    }
+        case 'CLICK':
+            if (location.hostname.includes('youtube.com')) {
+                return await clickYouTubeVideoByTitle(command.target || command.query, language);
+            }
 
-    return clickElement(command.target, language);
+            return clickElement(command.target || command.query, language);
+
         case 'TYPE':
             return typeIntoFocusedOrBestInput(command.query || command.target || '', language);
 
@@ -89,10 +100,123 @@ async function runPageAction(command) {
     }
 }
 
-async function selectResult(position) {
+function scrollPage(direction, language) {
+    const scrollTarget = findBestScrollableElement();
+    const amount = Math.max(420, Math.round(window.innerHeight * 0.85));
+    const delta = direction === 'down' ? amount : -amount;
+
+    if (!scrollTarget) {
+        return {
+            success: false,
+            message: 'I could not find anything scrollable on this page.'
+        };
+    }
+
+    const before = getScrollTop(scrollTarget);
+
+    if (scrollTarget === window) {
+        window.scrollBy({
+            top: delta,
+            left: 0,
+            behavior: 'smooth'
+        });
+    } else {
+        scrollTarget.scrollBy({
+            top: delta,
+            left: 0,
+            behavior: 'smooth'
+        });
+    }
+
+    setTimeout(function () {
+        const after = getScrollTop(scrollTarget);
+
+        if (Math.abs(after - before) < 5) {
+            const fallbackTarget = document.scrollingElement || document.documentElement || document.body;
+
+            if (fallbackTarget) {
+                fallbackTarget.scrollBy({
+                    top: delta,
+                    left: 0,
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }, 250);
+
+    return {
+        success: true,
+        message: direction === 'down'
+            ? getActionMessage('SCROLL_DOWN', language)
+            : getActionMessage('SCROLL_UP', language)
+    };
+}
+
+function findBestScrollableElement() {
+    const documentScroller = document.scrollingElement || document.documentElement || document.body;
+
+    if (canScrollElement(documentScroller)) {
+        return window;
+    }
+
+    const candidates = Array.from(document.querySelectorAll(
+        'ytd-app, ytd-page-manager, main, [role="main"], #content, #page-manager, section, div'
+    ))
+        .filter(canScrollElement)
+        .sort(function (a, b) {
+            return getScrollableScore(b) - getScrollableScore(a);
+        });
+
+    if (candidates.length > 0) {
+        return candidates[0];
+    }
+
+    return window;
+}
+
+function canScrollElement(element) {
+    if (!element) {
+        return false;
+    }
+
+    const style = window.getComputedStyle(element);
+
+    if (
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        style.overflow === 'hidden'
+    ) {
+        return false;
+    }
+
+    const overflowY = style.overflowY;
+    const canOverflow = ['auto', 'scroll', 'overlay', 'visible'].includes(overflowY);
+
+    return canOverflow && element.scrollHeight > element.clientHeight + 8;
+}
+
+function getScrollableScore(element) {
+    const rect = element.getBoundingClientRect();
+
+    return (
+        Math.max(0, rect.width) *
+        Math.max(0, rect.height) +
+        Math.max(0, element.scrollHeight - element.clientHeight)
+    );
+}
+
+function getScrollTop(target) {
+    if (target === window) {
+        return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    }
+
+    return target.scrollTop || 0;
+}
+
+async function selectResult(position, language) {
     const index = Number(position) - 1;
 
-    if (index < 0) {
+    if (index < 0 || Number.isNaN(index)) {
         return {
             success: false,
             message: 'Invalid result position.'
@@ -122,7 +246,7 @@ async function selectResult(position) {
 }
 
 async function waitForResults() {
-    for (let attempt = 0; attempt < 14; attempt++) {
+    for (let attempt = 0; attempt < 16; attempt++) {
         const results = getPageResults();
 
         if (results.length > 0) {
@@ -139,14 +263,7 @@ function getPageResults() {
     let results = [];
 
     if (location.hostname.includes('youtube.com')) {
-        results = Array.from(document.querySelectorAll(
-            'ytd-video-renderer a#video-title, ytd-video-renderer a#thumbnail, ytd-rich-item-renderer a#video-title-link, ytd-rich-item-renderer a#thumbnail, a#video-title'
-        ))
-            .filter(isVisible)
-            .filter(link => {
-                const href = link.href || '';
-                return href.includes('/watch');
-            });
+        results = getYouTubeResultLinks();
     } else if (location.hostname.includes('google.com')) {
         results = Array.from(document.querySelectorAll('a'))
             .filter(a => {
@@ -161,6 +278,42 @@ function getPageResults() {
     }
 
     return removeDuplicateLinks(results);
+}
+
+function getYouTubeResultLinks() {
+    const renderers = Array.from(document.querySelectorAll(
+        'ytd-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer'
+    ));
+
+    const links = [];
+
+    for (const renderer of renderers) {
+        const titleLink =
+            renderer.querySelector('a#video-title') ||
+            renderer.querySelector('a#video-title-link');
+
+        const thumbnailLink = renderer.querySelector('a#thumbnail');
+
+        const chosen = titleLink || thumbnailLink;
+
+        if (
+            chosen &&
+            isVisible(chosen) &&
+            String(chosen.href || '').includes('/watch')
+        ) {
+            links.push(chosen);
+        }
+    }
+
+    if (links.length === 0) {
+        return Array.from(document.querySelectorAll(
+            'a#video-title, a#video-title-link, a#thumbnail'
+        ))
+            .filter(isVisible)
+            .filter(link => String(link.href || '').includes('/watch'));
+    }
+
+    return links;
 }
 
 function readPage(language) {
@@ -220,7 +373,7 @@ function getMainText() {
         document.body
     ].filter(Boolean);
 
-    const text = candidates[0].innerText || '';
+    const text = candidates[0] && candidates[0].innerText ? candidates[0].innerText : '';
 
     return text
         .replace(/\s+/g, ' ')
@@ -229,7 +382,7 @@ function getMainText() {
 }
 
 function speak(text, language) {
-    if (!('speechSynthesis' in window)) {
+    if (!('speechSynthesis' in window) || !text) {
         return;
     }
 
@@ -410,8 +563,10 @@ function isEditableInput(element) {
 }
 
 function normalize(text) {
-    return String(text)
+    return String(text || '')
         .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -457,7 +612,7 @@ function removeDuplicateLinks(links) {
     const unique = [];
 
     for (const link of links) {
-        const key = link.href || link.innerText || link.getAttribute('aria-label') || '';
+        const key = getLinkUniqueKey(link);
 
         if (!key || seen.has(key)) {
             continue;
@@ -468,6 +623,25 @@ function removeDuplicateLinks(links) {
     }
 
     return unique;
+}
+
+function getLinkUniqueKey(link) {
+    const href = String(link.href || '');
+
+    if (href.includes('youtube.com/watch') || href.includes('/watch')) {
+        try {
+            const url = new URL(href, location.origin);
+            const videoId = url.searchParams.get('v');
+
+            if (videoId) {
+                return 'youtube:' + videoId;
+            }
+        } catch (error) {
+            return href;
+        }
+    }
+
+    return href || link.innerText || link.getAttribute('aria-label') || link.getAttribute('title') || '';
 }
 
 function sleep(milliseconds) {
@@ -560,29 +734,112 @@ const SUPPORTED_EXTENSION_VOICE_LANGUAGES = {
     allemand: 'de-DE'
 };
 
+const EXTENSION_VOICE_LANGUAGE_LABELS = {
+    'en-US': 'EN',
+    'fr-FR': 'FR',
+    'ar-TN': 'TN',
+    'ar-SA': 'AR',
+    'es-ES': 'ES',
+    'it-IT': 'IT',
+    'de-DE': 'DE'
+};
+
+const EXTENSION_VOICE_LANGUAGE_ORDER = [
+    'en-US',
+    'fr-FR',
+    'ar-TN',
+    'ar-SA',
+    'es-ES',
+    'it-IT',
+    'de-DE'
+];
+
 let pageRecognition = null;
 let pageIsListening = false;
-let pageVoiceLanguage = 'en-US';
+let pageVoiceLanguage = detectInitialVoiceLanguage();
 
 loadExtensionVoiceLanguage();
 createFloatingVoiceButton();
+
+if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(function (changes, areaName) {
+        if (areaName !== 'local') {
+            return;
+        }
+
+        if (changes.voiceAssistantLanguage && changes.voiceAssistantLanguage.newValue) {
+            setExtensionVoiceLanguage(changes.voiceAssistantLanguage.newValue, false);
+        }
+    });
+}
+
+function detectInitialVoiceLanguage() {
+    const browserLanguage = String(navigator.language || navigator.userLanguage || 'en-US');
+
+    if (browserLanguage.toLowerCase().startsWith('fr')) {
+        return 'fr-FR';
+    }
+
+    if (browserLanguage.toLowerCase().startsWith('ar-tn')) {
+        return 'ar-TN';
+    }
+
+    if (browserLanguage.toLowerCase().startsWith('ar')) {
+        return 'ar-SA';
+    }
+
+    if (browserLanguage.toLowerCase().startsWith('es')) {
+        return 'es-ES';
+    }
+
+    if (browserLanguage.toLowerCase().startsWith('it')) {
+        return 'it-IT';
+    }
+
+    if (browserLanguage.toLowerCase().startsWith('de')) {
+        return 'de-DE';
+    }
+
+    return 'en-US';
+}
 
 function loadExtensionVoiceLanguage() {
     try {
         chrome.storage.local.get(['voiceAssistantLanguage'], function (result) {
             if (chrome.runtime.lastError) {
+                updateFloatingButton(pageIsListening);
                 return;
             }
 
-            pageVoiceLanguage = result.voiceAssistantLanguage || 'en-US';
+            setExtensionVoiceLanguage(result.voiceAssistantLanguage || detectInitialVoiceLanguage(), false);
         });
     } catch (error) {
-        pageVoiceLanguage = 'en-US';
+        setExtensionVoiceLanguage(detectInitialVoiceLanguage(), false);
+    }
+}
+
+function setExtensionVoiceLanguage(language, saveToStorage) {
+    const normalizedLanguage = EXTENSION_VOICE_LANGUAGE_ORDER.includes(language)
+        ? language
+        : 'en-US';
+
+    pageVoiceLanguage = normalizedLanguage;
+
+    if (pageRecognition) {
+        pageRecognition.lang = pageVoiceLanguage;
+    }
+
+    updateFloatingButton(pageIsListening);
+
+    if (saveToStorage) {
+        saveExtensionVoiceLanguage(pageVoiceLanguage);
     }
 }
 
 function saveExtensionVoiceLanguage(language) {
-    pageVoiceLanguage = language || 'en-US';
+    pageVoiceLanguage = EXTENSION_VOICE_LANGUAGE_ORDER.includes(language)
+        ? language
+        : 'en-US';
 
     try {
         chrome.storage.local.set({
@@ -591,6 +848,8 @@ function saveExtensionVoiceLanguage(language) {
     } catch (error) {
         console.warn('Could not save extension voice language:', error);
     }
+
+    updateFloatingButton(pageIsListening);
 }
 
 function getCurrentExtensionVoiceLanguage() {
@@ -609,8 +868,11 @@ function createFloatingVoiceButton() {
     const button = document.createElement('button');
     button.id = 'voiceAssistantFloatingBtn';
     button.type = 'button';
-    button.innerText = '🎙️ Voice';
     button.setAttribute('aria-label', 'Start voice assistant');
+    button.setAttribute(
+        'title',
+        'Voice Assistant: Ctrl + Space to speak. Alt + Space also works. Ctrl + Shift + L changes language.'
+    );
 
     button.style.position = 'fixed';
     button.style.right = '20px';
@@ -625,7 +887,7 @@ function createFloatingVoiceButton() {
     button.style.fontWeight = '900';
     button.style.cursor = 'pointer';
     button.style.boxShadow = '0 12px 30px rgba(0,0,0,0.25)';
-    button.style.minWidth = '110px';
+    button.style.minWidth = '128px';
     button.style.minHeight = '58px';
 
     button.addEventListener('click', function () {
@@ -633,6 +895,7 @@ function createFloatingVoiceButton() {
     });
 
     document.body.appendChild(button);
+    updateFloatingButton(false);
 }
 
 function togglePageVoiceListening() {
@@ -649,6 +912,10 @@ function startPageVoiceListening() {
     if (!SpeechRecognition) {
         speakOnPage(getFallbackMessage('SPEECH_NOT_SUPPORTED', getCurrentExtensionVoiceLanguage()));
         return;
+    }
+
+    if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
     }
 
     if (!pageRecognition) {
@@ -677,6 +944,10 @@ function startPageVoiceListening() {
                 message = getFallbackMessage('MIC_BLOCKED', getCurrentExtensionVoiceLanguage());
             } else if (event && event.error === 'no-speech') {
                 message = getFallbackMessage('NO_SPEECH', getCurrentExtensionVoiceLanguage());
+            } else if (event && event.error === 'audio-capture') {
+                message = getFallbackMessage('NO_MICROPHONE', getCurrentExtensionVoiceLanguage());
+            } else if (event && event.error === 'network') {
+                message = getFallbackMessage('NETWORK_ERROR', getCurrentExtensionVoiceLanguage());
             }
 
             speakOnPage(message);
@@ -715,14 +986,30 @@ function updateFloatingButton(listening) {
         return;
     }
 
+    const label = EXTENSION_VOICE_LANGUAGE_LABELS[getCurrentExtensionVoiceLanguage()] || 'EN';
+
     if (listening) {
-        button.innerText = '🔴 Listening';
+        button.innerText = `🔴 ${label}`;
         button.style.background = '#dc2626';
     } else {
-        button.innerText = '🎙️ Voice';
+        button.innerText = `🎙️ ${label}`;
         button.style.background = '#2563eb';
     }
 }
+
+function cycleExtensionVoiceLanguage() {
+    const currentLanguage = getCurrentExtensionVoiceLanguage();
+    const currentIndex = EXTENSION_VOICE_LANGUAGE_ORDER.indexOf(currentLanguage);
+    const nextIndex = currentIndex === -1
+        ? 0
+        : (currentIndex + 1) % EXTENSION_VOICE_LANGUAGE_ORDER.length;
+
+    const nextLanguage = EXTENSION_VOICE_LANGUAGE_ORDER[nextIndex];
+
+    saveExtensionVoiceLanguage(nextLanguage);
+    speakOnPage(getExtensionLanguageChangeMessage(nextLanguage), nextLanguage);
+}
+
 function handlePageVoiceCommand(text) {
     const requestedLanguage = detectExtensionLanguageSetupCommand(text);
 
@@ -732,11 +1019,11 @@ function handlePageVoiceCommand(text) {
         return;
     }
 
-    const localPageAction = detectLocalPageAction(text);
+    const localPageCommand = detectLocalPageCommand(text);
 
-    if (localPageAction) {
+    if (localPageCommand) {
         runPageAction({
-            action: localPageAction,
+            ...localPageCommand,
             language: getCurrentExtensionVoiceLanguage()
         }).then(function (result) {
             speakOnPage(
@@ -799,6 +1086,7 @@ function normalizeExtensionText(text) {
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -813,6 +1101,7 @@ function detectExtensionLanguageSetupCommand(text) {
         'use ',
         'talk in ',
         'answer in ',
+        'switch to ',
 
         'parle ',
         'reponds en ',
@@ -820,12 +1109,14 @@ function detectExtensionLanguageSetupCommand(text) {
         'changer la langue en ',
         'change la langue en ',
         'utilise ',
+        'passe en ',
 
         'تكلم ',
         'احكي ',
         'جاوبني ب ',
         'بدل اللغة إلى ',
-        'بدل اللغة ل '
+        'بدل اللغة ل ',
+        'استعمل '
     ];
 
     for (const pattern of languagePatterns) {
@@ -833,10 +1124,20 @@ function detectExtensionLanguageSetupCommand(text) {
             const afterPattern = normalized.split(pattern).pop().trim();
 
             for (const languageName in SUPPORTED_EXTENSION_VOICE_LANGUAGES) {
-                if (afterPattern.includes(languageName)) {
+                if (afterPattern.includes(normalizeExtensionText(languageName))) {
                     return SUPPORTED_EXTENSION_VOICE_LANGUAGES[languageName];
                 }
             }
+        }
+    }
+
+    for (const languageName in SUPPORTED_EXTENSION_VOICE_LANGUAGES) {
+        if (
+            normalized === languageName ||
+            normalized === 'language ' + languageName ||
+            normalized === 'langue ' + languageName
+        ) {
+            return SUPPORTED_EXTENSION_VOICE_LANGUAGES[languageName];
         }
     }
 
@@ -888,6 +1189,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'Listening now.',
             VOICE_ERROR: 'Voice recognition error. Please try again.',
             MIC_BLOCKED: 'Microphone permission is blocked. Please allow microphone access for this site.',
+            NO_MICROPHONE: 'No microphone was found. Please check your microphone.',
+            NETWORK_ERROR: 'Speech recognition needs a network connection.',
             NO_SPEECH: 'I did not hear anything. Please try again.',
             NO_COMMAND: 'I did not hear a command.',
             MIC_STARTING: 'The microphone is already starting.',
@@ -911,6 +1214,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'J’écoute maintenant.',
             VOICE_ERROR: 'Erreur de reconnaissance vocale. Veuillez réessayer.',
             MIC_BLOCKED: 'L’accès au microphone est bloqué. Veuillez autoriser le microphone pour ce site.',
+            NO_MICROPHONE: 'Aucun microphone n’a été trouvé. Veuillez vérifier votre microphone.',
+            NETWORK_ERROR: 'La reconnaissance vocale nécessite une connexion Internet.',
             NO_SPEECH: 'Je n’ai rien entendu. Veuillez réessayer.',
             NO_COMMAND: 'Je n’ai pas entendu de commande.',
             MIC_STARTING: 'Le microphone est déjà en cours de démarrage.',
@@ -934,6 +1239,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'أنا أستمع الآن.',
             VOICE_ERROR: 'حدث خطأ في التعرّف على الصوت. حاول مرة أخرى.',
             MIC_BLOCKED: 'إذن الميكروفون محظور. يرجى السماح باستخدام الميكروفون لهذا الموقع.',
+            NO_MICROPHONE: 'لم يتم العثور على ميكروفون. يرجى التحقق من الميكروفون.',
+            NETWORK_ERROR: 'التعرّف على الصوت يحتاج إلى اتصال بالإنترنت.',
             NO_SPEECH: 'لم أسمع أي شيء. حاول مرة أخرى.',
             NO_COMMAND: 'لم أسمع أمراً.',
             MIC_STARTING: 'الميكروفون قيد التشغيل بالفعل.',
@@ -957,6 +1264,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'Escuchando ahora.',
             VOICE_ERROR: 'Error de reconocimiento de voz. Inténtalo de nuevo.',
             MIC_BLOCKED: 'El permiso del micrófono está bloqueado. Permite el acceso al micrófono para este sitio.',
+            NO_MICROPHONE: 'No se encontró ningún micrófono. Comprueba tu micrófono.',
+            NETWORK_ERROR: 'El reconocimiento de voz necesita conexión a Internet.',
             NO_SPEECH: 'No escuché nada. Inténtalo de nuevo.',
             NO_COMMAND: 'No escuché ningún comando.',
             MIC_STARTING: 'El micrófono ya se está iniciando.',
@@ -980,6 +1289,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'Sto ascoltando.',
             VOICE_ERROR: 'Errore di riconoscimento vocale. Riprova.',
             MIC_BLOCKED: 'Il permesso del microfono è bloccato. Consenti l’accesso al microfono per questo sito.',
+            NO_MICROPHONE: 'Nessun microfono trovato. Controlla il microfono.',
+            NETWORK_ERROR: 'Il riconoscimento vocale richiede una connessione Internet.',
             NO_SPEECH: 'Non ho sentito nulla. Riprova.',
             NO_COMMAND: 'Non ho sentito un comando.',
             MIC_STARTING: 'Il microfono si sta già avviando.',
@@ -1003,6 +1314,8 @@ function getFallbackMessage(key, language) {
             LISTENING_NOW: 'Ich höre jetzt zu.',
             VOICE_ERROR: 'Fehler bei der Spracherkennung. Bitte versuche es erneut.',
             MIC_BLOCKED: 'Der Mikrofonzugriff ist blockiert. Bitte erlaube den Mikrofonzugriff für diese Seite.',
+            NO_MICROPHONE: 'Kein Mikrofon gefunden. Bitte überprüfe dein Mikrofon.',
+            NETWORK_ERROR: 'Spracherkennung benötigt eine Internetverbindung.',
             NO_SPEECH: 'Ich habe nichts gehört. Bitte versuche es erneut.',
             NO_COMMAND: 'Ich habe keinen Befehl gehört.',
             MIC_STARTING: 'Das Mikrofon startet bereits.',
@@ -1156,14 +1469,103 @@ function getMessageByLanguage(language, messages) {
     return messages[group] || messages.en;
 }
 
-document.addEventListener('keydown', function (event) {
-    if (event.code === 'Space' && event.altKey && !event.ctrlKey && !event.shiftKey && !event.metaKey) {
+function isVoiceAssistantCtrlSpace(event) {
+    return (
+        event.code === 'Space' &&
+        event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.metaKey
+    );
+}
+
+function isVoiceAssistantAltSpace(event) {
+    return (
+        event.code === 'Space' &&
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.metaKey
+    );
+}
+
+function isVoiceAssistantLanguageShortcut(event) {
+    return (
+        event.code === 'KeyL' &&
+        event.ctrlKey &&
+        event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey
+    );
+}
+
+function blockVoiceAssistantShortcut(event) {
+    if (
+        isVoiceAssistantCtrlSpace(event) ||
+        isVoiceAssistantAltSpace(event) ||
+        isVoiceAssistantLanguageShortcut(event)
+    ) {
         event.preventDefault();
-        togglePageVoiceListening();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+        }
+
+        return true;
     }
-});
-function detectLocalPageAction(text) {
+
+    return false;
+}
+
+function handleVoiceAssistantShortcut(event) {
+    if (isVoiceAssistantCtrlSpace(event) || isVoiceAssistantAltSpace(event)) {
+        blockVoiceAssistantShortcut(event);
+
+        if (!event.repeat && event.type === 'keydown') {
+            togglePageVoiceListening();
+        }
+
+        return;
+    }
+
+    if (isVoiceAssistantLanguageShortcut(event)) {
+        blockVoiceAssistantShortcut(event);
+
+        if (!event.repeat && event.type === 'keydown') {
+            cycleExtensionVoiceLanguage();
+        }
+    }
+}
+
+window.addEventListener('keydown', handleVoiceAssistantShortcut, true);
+window.addEventListener('keypress', blockVoiceAssistantShortcut, true);
+window.addEventListener('keyup', blockVoiceAssistantShortcut, true);
+
+document.addEventListener('keydown', handleVoiceAssistantShortcut, true);
+document.addEventListener('keypress', blockVoiceAssistantShortcut, true);
+document.addEventListener('keyup', blockVoiceAssistantShortcut, true);
+
+function detectLocalPageCommand(text) {
     const normalized = normalizeExtensionText(text);
+
+    const videoNumber = detectVideoNumberCommand(normalized);
+
+    if (videoNumber !== null) {
+        return {
+            action: 'SELECT_RESULT',
+            resultPosition: videoNumber
+        };
+    }
+
+    const videoTitle = detectVideoTitleCommand(text);
+
+    if (videoTitle !== null) {
+        return {
+            action: 'CLICK',
+            target: videoTitle
+        };
+    }
 
     if (
         normalized.includes('stop muting') ||
@@ -1178,7 +1580,7 @@ function detectLocalPageAction(text) {
         normalized.includes('شغل الصوت') ||
         normalized.includes('رجع الصوت')
     ) {
-        return 'UNMUTE';
+        return { action: 'UNMUTE' };
     }
 
     if (
@@ -1191,7 +1593,7 @@ function detectLocalPageAction(text) {
         normalized.includes('اطفي الصوت') ||
         normalized.includes('كتم الصوت')
     ) {
-        return 'MUTE';
+        return { action: 'MUTE' };
     }
 
     if (
@@ -1203,7 +1605,7 @@ function detectLocalPageAction(text) {
         normalized.includes('mets pause') ||
         normalized.includes('وقف الفيديو')
     ) {
-        return 'PAUSE_VIDEO';
+        return { action: 'PAUSE_VIDEO' };
     }
 
     if (
@@ -1216,26 +1618,29 @@ function detectLocalPageAction(text) {
         normalized.includes('joue la video') ||
         normalized.includes('شغل الفيديو')
     ) {
-        return 'PLAY_VIDEO';
+        return { action: 'PLAY_VIDEO' };
     }
 
     if (
         normalized.includes('scroll down') ||
+        normalized.includes('page down') ||
         normalized.includes('go down') ||
         normalized.includes('show me more') ||
+        normalized.includes('scroll more') ||
         normalized.includes('descends') ||
         normalized.includes('انزل')
     ) {
-        return 'SCROLL_DOWN';
+        return { action: 'SCROLL_DOWN' };
     }
 
     if (
         normalized.includes('scroll up') ||
+        normalized.includes('page up') ||
         normalized.includes('go up') ||
         normalized.includes('monte') ||
         normalized.includes('اطلع')
     ) {
-        return 'SCROLL_UP';
+        return { action: 'SCROLL_UP' };
     }
 
     if (
@@ -1244,11 +1649,129 @@ function detectLocalPageAction(text) {
         normalized.includes('retour') ||
         normalized.includes('ارجع')
     ) {
-        return 'GO_BACK';
+        return { action: 'GO_BACK' };
     }
 
     return null;
 }
+
+function detectVideoNumberCommand(normalized) {
+    if (
+        !normalized.includes('video') &&
+        !normalized.includes('result') &&
+        !normalized.includes('number')
+    ) {
+        return null;
+    }
+
+    if (
+        !normalized.includes('open') &&
+        !normalized.includes('play') &&
+        !normalized.includes('select') &&
+        !normalized.includes('click')
+    ) {
+        return null;
+    }
+
+    let match = normalized.match(/\b(?:video|result)\s+(?:number\s+)?(\d+)\b/);
+
+    if (match) {
+        const number = Number(match[1]);
+        return number > 0 ? number : null;
+    }
+
+    match = normalized.match(/\bnumber\s+(\d+)\b/);
+
+    if (match) {
+        const number = Number(match[1]);
+        return number > 0 ? number : null;
+    }
+
+    match = normalized.match(/\b(?:video|result)\s+(?:number\s+)?([a-z]+)\b/);
+
+    if (match) {
+        return spokenNumberToInt(match[1]);
+    }
+
+    match = normalized.match(/\bnumber\s+([a-z]+)\b/);
+
+    if (match) {
+        return spokenNumberToInt(match[1]);
+    }
+
+    return null;
+}
+
+function detectVideoTitleCommand(text) {
+    const raw = String(text || '').trim();
+
+    const patterns = [
+        /^(?:open|play|select|click)\s+(?:the\s+)?video\s+(?:called|named|titled|title)\s+(.+)$/i,
+        /^(?:open|play|select|click)\s+(?:the\s+)?(.+?)\s+video$/i
+    ];
+
+    for (const pattern of patterns) {
+        const match = raw.match(pattern);
+
+        if (!match) {
+            continue;
+        }
+
+        const title = String(match[1] || '').trim();
+
+        if (!title) {
+            continue;
+        }
+
+        const normalizedTitle = normalizeExtensionText(title);
+
+        if (
+            ['youtube', 'google', 'facebook', 'gmail', 'home', 'profile', 'files', 'settings'].includes(normalizedTitle)
+        ) {
+            continue;
+        }
+
+        return title;
+    }
+
+    return null;
+}
+
+function spokenNumberToInt(word) {
+    const normalized = normalizeExtensionText(word);
+
+    const numbers = {
+        one: 1,
+        first: 1,
+        won: 1,
+        two: 2,
+        second: 2,
+        to: 2,
+        too: 2,
+        three: 3,
+        third: 3,
+        tree: 3,
+        four: 4,
+        fourth: 4,
+        for: 4,
+        five: 5,
+        fifth: 5,
+        six: 6,
+        sixth: 6,
+        seven: 7,
+        seventh: 7,
+        eight: 8,
+        eighth: 8,
+        ate: 8,
+        nine: 9,
+        ninth: 9,
+        ten: 10,
+        tenth: 10
+    };
+
+    return numbers[normalized] || null;
+}
+
 async function clickYouTubeVideoByTitle(targetText, language) {
     if (!targetText) {
         return {
@@ -1259,7 +1782,7 @@ async function clickYouTubeVideoByTitle(targetText, language) {
 
     const normalizedTarget = normalize(targetText);
 
-    for (let attempt = 0; attempt < 14; attempt++) {
+    for (let attempt = 0; attempt < 16; attempt++) {
         const videoLinks = getYouTubeVideoTitleLinks();
 
         let bestLink = null;
@@ -1332,12 +1855,36 @@ async function clickYouTubeVideoByTitle(targetText, language) {
 }
 
 function getYouTubeVideoTitleLinks() {
-    return Array.from(document.querySelectorAll(
-        'ytd-video-renderer a#video-title, ytd-rich-item-renderer a#video-title-link, a#video-title'
-    ))
-        .filter(isVisible)
-        .filter(link => {
-            const href = link.href || '';
-            return href.includes('/watch');
-        });
+    const links = [];
+
+    const renderers = Array.from(document.querySelectorAll(
+        'ytd-video-renderer, ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer'
+    ));
+
+    for (const renderer of renderers) {
+        const titleLink =
+            renderer.querySelector('a#video-title') ||
+            renderer.querySelector('a#video-title-link');
+
+        if (
+            titleLink &&
+            isVisible(titleLink) &&
+            String(titleLink.href || '').includes('/watch')
+        ) {
+            links.push(titleLink);
+        }
+    }
+
+    if (links.length === 0) {
+        links.push(...Array.from(document.querySelectorAll(
+            'ytd-video-renderer a#video-title, ytd-rich-item-renderer a#video-title-link, a#video-title'
+        ))
+            .filter(isVisible)
+            .filter(link => {
+                const href = link.href || '';
+                return href.includes('/watch');
+            }));
+    }
+
+    return removeDuplicateLinks(links);
 }

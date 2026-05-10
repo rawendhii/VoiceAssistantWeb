@@ -2,13 +2,11 @@
 
 namespace App\Controller;
 
-use App\Service\AiCommandLogService;
-use App\Service\GmailService;
-use App\Service\LlmCommandInterpreterService;
+use App\Service\GeminiChatService;
+use App\Service\VoiceEmailCommandService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
 class ApiVoiceController extends AbstractController
@@ -16,230 +14,1242 @@ class ApiVoiceController extends AbstractController
     #[Route('/api/voice/interpret', name: 'api_voice_interpret', methods: ['POST', 'OPTIONS'])]
     public function interpret(
         Request $request,
-        RequestStack $requestStack,
-        LlmCommandInterpreterService $llmCommandInterpreter,
-        AiCommandLogService $aiCommandLogService,
-        GmailService $gmailService
+        GeminiChatService $geminiChatService,
+        VoiceEmailCommandService $voiceEmailCommandService
     ): JsonResponse {
         if ($request->getMethod() === 'OPTIONS') {
             return $this->json([
                 'success' => true,
                 'message' => 'CORS preflight accepted.',
-            ], 200);
+            ]);
         }
 
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = json_decode($request->getContent(), true);
 
-        if (!is_array($data)) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Invalid JSON body.',
-            ], 400);
-        }
-
-        $spokenText = trim((string) ($data['text'] ?? ''));
-        $language = trim((string) ($data['language'] ?? 'en-US'));
-        $browserContext = $data['browserContext'] ?? null;
-
-        if ($spokenText === '') {
-            return $this->json([
-                'success' => false,
-                'message' => 'The text field is required.',
-            ], 400);
-        }
-
-        $user = $this->getUser();
-        $userId = is_object($user) && method_exists($user, 'getId') ? $user->getId() : null;
-
-        $pendingCancelResult = $this->handlePendingEmailCancellationCommand(
-            $spokenText,
-            $requestStack,
-            $aiCommandLogService,
-            $userId
-        );
-
-        if (is_array($pendingCancelResult)) {
-            return $this->json($pendingCancelResult, 200);
-        }
-
-        $pendingBodyResult = $this->completePendingEmailBodyCommand(
-            $spokenText,
-            $language,
-            $requestStack,
-            $aiCommandLogService,
-            $userId
-        );
-
-        if (is_array($pendingBodyResult)) {
-            return $this->json($pendingBodyResult, 200);
-        }
-
-        /*
-         * Local email fallback first.
-         * This prevents "send an email to john@gmail.com" from being detected as "open Gmail".
-         */
-        $localEmailResult = $this->tryLocalEmailCommand($spokenText, $language);
-
-        if (is_array($localEmailResult)) {
-            $emailResult = $this->handleEmailAction(
-                $localEmailResult,
-                $spokenText,
-                $userId,
-                $requestStack,
-                $aiCommandLogService,
-                $gmailService
-            );
-
-            return $this->json($emailResult, 200);
-        }
-
-        /*
-         * Local browser / website fallback.
-         * Browser/page controls are checked before website open/search logic.
-         */
-        $localResult = $this->tryLocalExternalCommand($spokenText, $language, $browserContext);
-
-        if ($localResult !== null) {
-            $aiCommandLogService->log($spokenText, $localResult, $userId);
-
-            return $this->json($localResult, 200);
-        }
-
-        /*
-         * LLM mode:
-         * Symfony + LLM = brain
-         * Chrome extension = executor
-         */
-        $allowedActions = $this->getAllowedExternalActionsForLlm();
-
-        $llmResponse = $llmCommandInterpreter->interpretWebsiteCommand(
-            $spokenText,
-            $allowedActions,
-            $language,
-            is_array($browserContext) ? $browserContext : null
-        );
-
-        if (($llmResponse['success'] ?? false) !== true) {
-            $message = $llmResponse['message'] ?? 'LLM interpretation failed.';
-
-            if (str_contains($message, 'HTTP 402')) {
-                $message = 'The AI service quota is exhausted. Basic browser commands still work, but advanced natural-language interpretation needs a working AI API key.';
+            if (!is_array($data)) {
+                return $this->json([
+                    'success' => false,
+                    'intent' => 'UNKNOWN',
+                    'mode' => 'INVALID_JSON',
+                    'requiresExtension' => false,
+                    'message' => 'Invalid JSON body.',
+                    'speech' => 'Invalid JSON body.',
+                ], 400);
             }
 
-            $failedResult = [
-                'success' => false,
-                'message' => $message,
-                'speech' => $message,
-                'llmResult' => $llmResponse['result'] ?? $llmResponse['llmResult'] ?? null,
-                'mode' => 'LLM_FAILED',
-            ];
+            $spokenText = trim((string) ($data['text'] ?? ''));
+            $language = trim((string) ($data['language'] ?? 'en-US'));
+            $browserContext = $data['browserContext'] ?? null;
+            $baseUrl = $request->getSchemeAndHttpHost();
 
-            $aiCommandLogService->log($spokenText, $failedResult, $userId);
+            if ($spokenText === '') {
+                return $this->json([
+                    'success' => false,
+                    'intent' => 'UNKNOWN',
+                    'mode' => 'EMPTY_TEXT',
+                    'requiresExtension' => false,
+                    'message' => 'The text field is required.',
+                    'speech' => 'The text field is required.',
+                ], 400);
+            }
 
-            return $this->json($failedResult, 200);
-        }
+            /*
+             * 1. Email commands first.
+             * These are handled by Symfony/Gmail, not Gemini and not the extension.
+             */
+            $emailResult = $voiceEmailCommandService->handle($spokenText);
 
-        $llmResult = $llmResponse['result'];
-        $intent = strtoupper((string) ($llmResult['intent'] ?? ''));
+            if ($emailResult !== null) {
+                return $this->json($emailResult);
+            }
 
-        if ($intent === 'EMAIL_ACTION') {
-            $emailResult = $this->handleEmailAction(
-                $llmResult,
+            /*
+             * 2. Safe local commands.
+             * The controller decides what is executable.
+             * Gemini is not the executor.
+             */
+            $localResult = $this->tryLocalCommand(
                 $spokenText,
-                $userId,
-                $requestStack,
-                $aiCommandLogService,
-                $gmailService
+                $language,
+                is_array($browserContext) ? $browserContext : null,
+                $baseUrl
             );
 
-            return $this->json($emailResult, 200);
-        }
+            if ($localResult !== null) {
+                return $this->json($localResult);
+            }
 
-        if ($intent === 'UNKNOWN') {
-            $unknownResult = [
+            /*
+             * 3. Gemini chatbot fallback.
+             * Gemini answers normal conversation and unsupported questions only.
+             */
+            $chatResult = $geminiChatService->chat(
+                $this->buildSafeChatPrompt($spokenText),
+                $language
+            );
+
+            if (!is_array($chatResult)) {
+                return $this->json([
+                    'success' => false,
+                    'intent' => 'CHAT',
+                    'mode' => 'GEMINI_CHAT_INVALID',
+                    'requiresExtension' => false,
+                    'message' => 'Gemini returned an invalid chat response.',
+                    'speech' => 'Gemini returned an invalid chat response.',
+                ]);
+            }
+
+            $reply =
+                $this->nullableString($chatResult['speech'] ?? null) ??
+                $this->nullableString($chatResult['message'] ?? null) ??
+                $this->nullableString($chatResult['reply'] ?? null) ??
+                'I understood you, but I do not have a clear answer.';
+
+            return $this->json([
+                'success' => (bool) ($chatResult['success'] ?? true),
+                'intent' => 'CHAT',
+                'mode' => 'GEMINI_CHAT',
+                'requiresExtension' => false,
+                'message' => $reply,
+                'speech' => $reply,
+                'rawGeminiResult' => $chatResult,
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->json([
                 'success' => false,
                 'intent' => 'UNKNOWN',
-                'mode' => 'LLM_UNKNOWN',
+                'mode' => 'SERVER_EXCEPTION',
                 'requiresExtension' => false,
-                'message' => $llmResult['speech'] ?? 'I could not safely understand that command.',
-                'speech' => $llmResult['speech'] ?? 'I could not safely understand that command.',
-                'reason' => $llmResult['reason'] ?? null,
-                'confidence' => $llmResult['confidence'] ?? null,
-            ];
-
-            $aiCommandLogService->log($spokenText, $unknownResult, $userId);
-
-            return $this->json($unknownResult, 200);
+                'message' => 'Voice interpreter server error: ' . $exception->getMessage(),
+                'speech' => 'A server error happened while interpreting the voice command.',
+            ], 500);
         }
-
-        if ($intent === 'BROWSER_ACTION') {
-            $browserResult = $this->buildBrowserActionResult($llmResult, $language, $browserContext);
-
-            $aiCommandLogService->log($spokenText, $browserResult, $userId);
-
-            return $this->json($browserResult, 200);
-        }
-
-        if ($intent === 'WEBSITE_ACTION') {
-            $websiteResult = $this->buildWebsiteActionResult($llmResult, $language, $browserContext);
-
-            $aiCommandLogService->log($spokenText, $websiteResult, $userId);
-
-            return $this->json($websiteResult, 200);
-        }
-
-        $fallbackResult = [
-            'success' => false,
-            'intent' => 'UNKNOWN',
-            'mode' => 'UNSUPPORTED_INTENT',
-            'requiresExtension' => false,
-            'message' => 'I could not match that to a supported action.',
-            'speech' => 'I could not match that to a supported action.',
-            'rawLlmResult' => $llmResult,
-        ];
-
-        $aiCommandLogService->log($spokenText, $fallbackResult, $userId);
-
-        return $this->json($fallbackResult, 200);
     }
 
-    private function buildBrowserActionResult(array $llmResult, string $language, mixed $browserContext): array
+    private function tryLocalCommand(string $text, string $language, ?array $browserContext, string $baseUrl): ?array
     {
-        $resultPosition = $this->normalizeResultPosition($llmResult['resultPosition'] ?? null);
+        $normalized = $this->normalizeText($text);
+
+        /*
+         * Dangerous or unavailable account actions.
+         * Do not let Gemini invent Settings/Security/Delete Account pages.
+         */
+        if ($this->isDeleteAccountCommand($normalized)) {
+            return $this->buildDeleteAccountResponse($baseUrl);
+        }
+
+        if ($this->isDisableAssistantCommand($normalized)) {
+            return $this->buildLocalMessageAction(
+                'LOCAL_DISABLE_ASSISTANT_NOT_AVAILABLE',
+                'There is no voice assistant disable setting connected yet. You can stop listening by pressing Stop, or say log out to leave your account.',
+                'There is no voice assistant disable setting connected yet. You can stop listening by pressing Stop, or say log out to leave your account.'
+            );
+        }
+
+        /*
+         * Account/session commands.
+         */
+        if ($this->isLogoutCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['app_logout', 'security_logout', 'logout'],
+                    '/logout',
+                    $baseUrl
+                ),
+                'Logging you out.',
+                'LOCAL_APP_LOGOUT'
+            );
+        }
+
+        if ($this->isChangePasswordCommand($normalized)) {
+            return $this->buildChangePasswordResponse($baseUrl);
+        }
+
+        if ($this->isSettingsCommand($normalized)) {
+            return $this->buildSettingsResponse($baseUrl);
+        }
+
+        if ($this->isGmailConnectCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['google_oauth_connect'],
+                    '/google/oauth/connect',
+                    $baseUrl
+                ),
+                'Opening Gmail connection.',
+                'LOCAL_GMAIL_CONNECT'
+            );
+        }
+
+        /*
+         * Internal app navigation.
+         */
+        if ($this->isHomeCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['front_home', 'app_home', 'home'],
+                    '/front/home',
+                    $baseUrl
+                ),
+                'Opening home.',
+                'LOCAL_APP_HOME'
+            );
+        }
+
+        if ($this->isProfileCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['front_profile', 'app_profile', 'profile'],
+                    '/front/profile',
+                    $baseUrl
+                ),
+                'Opening your profile.',
+                'LOCAL_APP_PROFILE'
+            );
+        }
+
+        if ($this->isFilesCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['front_files', 'app_files', 'files'],
+                    '/front/files',
+                    $baseUrl
+                ),
+                'Opening your files.',
+                'LOCAL_APP_FILES'
+            );
+        }
+
+        if ($this->isVoiceCommandsCommand($normalized)) {
+            return $this->buildAppNavigationAction(
+                $this->buildFirstAvailableLocalAppUrl(
+                    ['front_voice_commands', 'voice_commands', 'app_voice_commands'],
+                    '/front/voice-commands',
+                    $baseUrl
+                ),
+                'Opening voice commands.',
+                'LOCAL_APP_VOICE_COMMANDS'
+            );
+        }
+
+        /*
+         * Website open/search.
+         * These produce a friendly assistant answer AND executor command.
+         */
+        $websiteAliases = [
+            'youtube' => ['youtube', 'you tube', 'ytb', 'y t b', 'yt'],
+            'google' => ['google', 'gogle'],
+            'facebook' => ['facebook', 'fb'],
+            'gmail' => ['gmail', 'google mail'],
+        ];
+
+        foreach ($websiteAliases as $website => $aliases) {
+            foreach ($aliases as $alias) {
+                $searchQuery = $this->extractWebsiteSearchQuery($normalized, $alias);
+
+                if ($searchQuery !== null) {
+                    return $this->buildWebsiteAction(
+                        'SEARCH',
+                        $website,
+                        null,
+                        $searchQuery,
+                        $this->buildWebsiteSearchSpeech($website, $searchQuery),
+                        $language,
+                        $browserContext,
+                        'LOCAL_WEBSITE_SEARCH'
+                    );
+                }
+
+                if ($this->isWebsiteOpenCommand($normalized, $alias)) {
+                    return $this->buildWebsiteAction(
+                        'OPEN_URL',
+                        $website,
+                        null,
+                        null,
+                        $this->buildWebsiteOpenSpeech($website),
+                        $language,
+                        $browserContext,
+                        'LOCAL_WEBSITE_OPEN'
+                    );
+                }
+            }
+        }
+
+        /*
+         * Natural implicit website searches:
+         * - night club music on YouTube
+         * - cats on ytb
+         * - play night club music on YouTube
+         */
+        $implicitWebsiteSearch = $this->extractImplicitWebsiteSearch($normalized);
+
+        if ($implicitWebsiteSearch !== null) {
+            return $this->buildWebsiteAction(
+                'SEARCH',
+                $implicitWebsiteSearch['website'],
+                null,
+                $implicitWebsiteSearch['query'],
+                $this->buildWebsiteSearchSpeech($implicitWebsiteSearch['website'], $implicitWebsiteSearch['query']),
+                $language,
+                $browserContext,
+                'LOCAL_IMPLICIT_WEBSITE_SEARCH'
+            );
+        }
+
+        /*
+         * Current controlled website search:
+         * User opens YouTube, then says "search for cats".
+         */
+        $currentWebsite = $this->detectCurrentWebsiteFromContext($browserContext);
+        $currentWebsiteSearchQuery = $this->extractCurrentWebsiteSearchQuery($normalized);
+
+        if ($currentWebsite !== null && $currentWebsiteSearchQuery !== null) {
+            return $this->buildWebsiteAction(
+                'SEARCH',
+                $currentWebsite,
+                null,
+                $currentWebsiteSearchQuery,
+                $this->buildWebsiteSearchSpeech($currentWebsite, $currentWebsiteSearchQuery),
+                $language,
+                $browserContext,
+                'LOCAL_CURRENT_WEBSITE_SEARCH'
+            );
+        }
+
+        /*
+         * YouTube/search result video selection.
+         */
+        $videoSelection = $this->matchVideoSelectionCommand($normalized);
+
+        if ($videoSelection !== null) {
+            return $this->buildBrowserAction(
+                'SELECT_RESULT',
+                null,
+                null,
+                $videoSelection,
+                'Sure, I will open video number ' . $videoSelection . ' now.',
+                $language,
+                $browserContext,
+                'LOCAL_VIDEO_SELECT_RESULT'
+            );
+        }
+
+        $videoTitle = $this->matchVideoTitleCommand($text);
+
+        if ($videoTitle !== null) {
+            return $this->buildBrowserAction(
+                'CLICK',
+                null,
+                $videoTitle,
+                null,
+                'Sure, I will open the matching video now.',
+                $language,
+                $browserContext,
+                'LOCAL_VIDEO_CLICK_TITLE'
+            );
+        }
+
+        /*
+         * Browser/page controls.
+         */
+        $browserAction = $this->matchBrowserAction($normalized);
+
+        if ($browserAction !== null) {
+            return $this->buildBrowserAction(
+                $browserAction,
+                null,
+                null,
+                null,
+                $this->speechForBrowserAction($browserAction),
+                $language,
+                $browserContext,
+                'LOCAL_BROWSER_ACTION'
+            );
+        }
+
+        if (preg_match('/^(open|click|select|play)\s+(?:result\s+)?(?:number\s+)?(\d+)$/i', $normalized, $matches)) {
+            return $this->buildBrowserAction(
+                'SELECT_RESULT',
+                null,
+                null,
+                (int) $matches[2],
+                'Sure, I will open result number ' . $matches[2] . ' now.',
+                $language,
+                $browserContext,
+                'LOCAL_SELECT_RESULT'
+            );
+        }
+
+        if (preg_match('/^(open|click|select|play)\s+(?:result\s+)?(?:number\s+)?([a-z]+)$/i', $normalized, $matches)) {
+            $number = $this->spokenNumberToInt($matches[2]);
+
+            if ($number !== null) {
+                return $this->buildBrowserAction(
+                    'SELECT_RESULT',
+                    null,
+                    null,
+                    $number,
+                    'Sure, I will open result number ' . $number . ' now.',
+                    $language,
+                    $browserContext,
+                    'LOCAL_SELECT_RESULT_WORD'
+                );
+            }
+        }
+
+        if (preg_match('/^(click|press|select)\s+(.+)$/i', $text, $matches)) {
+            $target = trim($matches[2]);
+
+            if ($target !== '') {
+                return $this->buildBrowserAction(
+                    'CLICK',
+                    null,
+                    $target,
+                    null,
+                    'Sure, I will click ' . $target . ' now.',
+                    $language,
+                    $browserContext,
+                    'LOCAL_CLICK'
+                );
+            }
+        }
+
+        if (preg_match('/^(type|write|enter)\s+(.+)$/i', $text, $matches)) {
+            $query = trim($matches[2]);
+
+            if ($query !== '') {
+                return $this->buildBrowserAction(
+                    'TYPE',
+                    $query,
+                    null,
+                    null,
+                    'Sure, I will type that now.',
+                    $language,
+                    $browserContext,
+                    'LOCAL_TYPE'
+                );
+            }
+        }
+
+        return null;
+    }
+
+    private function isDeleteAccountCommand(string $normalized): bool
+    {
+        if (
+            !str_contains($normalized, 'account') &&
+            !str_contains($normalized, 'profile')
+        ) {
+            return false;
+        }
+
+        return (
+            str_contains($normalized, 'delete my account') ||
+            str_contains($normalized, 'delete account') ||
+            str_contains($normalized, 'remove my account') ||
+            str_contains($normalized, 'remove account') ||
+            str_contains($normalized, 'close my account') ||
+            str_contains($normalized, 'close account') ||
+            str_contains($normalized, 'deactivate my account') ||
+            str_contains($normalized, 'deactivate account') ||
+            str_contains($normalized, 'erase my account') ||
+            str_contains($normalized, 'erase account') ||
+            str_contains($normalized, 'i want to delete the account') ||
+            str_contains($normalized, 'i want to delete my account') ||
+            str_contains($normalized, 'i want to close my account')
+        );
+    }
+
+    private function isDisableAssistantCommand(string $normalized): bool
+    {
+        return (
+            str_contains($normalized, 'get rid of you') ||
+            str_contains($normalized, 'remove voice assistant') ||
+            str_contains($normalized, 'disable voice assistant') ||
+            str_contains($normalized, 'turn off voice assistant') ||
+            str_contains($normalized, 'switch off voice assistant') ||
+            str_contains($normalized, 'hide voice assistant') ||
+            str_contains($normalized, 'stop voice assistant') ||
+            str_contains($normalized, 'disable assistant') ||
+            str_contains($normalized, 'turn you off') ||
+            str_contains($normalized, 'i do not want you') ||
+            str_contains($normalized, 'i dont want you') ||
+            str_contains($normalized, 'i don t want you')
+        );
+    }
+
+    private function isLogoutCommand(string $normalized): bool
+    {
+        return (
+            $normalized === 'logout' ||
+            $normalized === 'log out' ||
+            $normalized === 'sign out' ||
+            $normalized === 'disconnect' ||
+            $normalized === 'exit account' ||
+            $normalized === 'close my session' ||
+            $normalized === 'end my session' ||
+            str_contains($normalized, 'log me out') ||
+            str_contains($normalized, 'sign me out') ||
+            str_contains($normalized, 'logout from my account') ||
+            str_contains($normalized, 'log out from my account') ||
+            str_contains($normalized, 'disconnect my account')
+        );
+    }
+
+    private function isChangePasswordCommand(string $normalized): bool
+    {
+        if (!preg_match('/\bpassword\b/u', $normalized)) {
+            return false;
+        }
+
+        return (
+            str_contains($normalized, 'change password') ||
+            str_contains($normalized, 'change my password') ||
+            str_contains($normalized, 'update password') ||
+            str_contains($normalized, 'update my password') ||
+            str_contains($normalized, 'modify password') ||
+            str_contains($normalized, 'edit password') ||
+            str_contains($normalized, 'reset password') ||
+            str_contains($normalized, 'reset my password') ||
+            str_contains($normalized, 'forgot password') ||
+            str_contains($normalized, 'password settings') ||
+            str_contains($normalized, 'password section') ||
+            str_contains($normalized, 'i want to change my password') ||
+            str_contains($normalized, 'i need to change my password') ||
+            str_contains($normalized, 'take me to change password') ||
+            str_contains($normalized, 'open change password') ||
+            str_contains($normalized, 'open password')
+        );
+    }
+
+    private function isSettingsCommand(string $normalized): bool
+    {
+        return (
+            $normalized === 'settings' ||
+            $normalized === 'open settings' ||
+            $normalized === 'go to settings' ||
+            $normalized === 'show settings' ||
+            $normalized === 'account settings' ||
+            $normalized === 'open account settings' ||
+            $normalized === 'go to account settings' ||
+            $normalized === 'security settings' ||
+            $normalized === 'open security' ||
+            $normalized === 'go to security' ||
+            str_contains($normalized, 'take me to settings') ||
+            str_contains($normalized, 'open my settings') ||
+            str_contains($normalized, 'show my settings') ||
+            str_contains($normalized, 'open security settings') ||
+            str_contains($normalized, 'show security settings')
+        );
+    }
+
+    private function isGmailConnectCommand(string $normalized): bool
+    {
+        return (
+            str_contains($normalized, 'connect gmail') ||
+            str_contains($normalized, 'connect my gmail') ||
+            str_contains($normalized, 'gmail connection') ||
+            str_contains($normalized, 'connect email') ||
+            str_contains($normalized, 'connect my email') ||
+            str_contains($normalized, 'connect google email') ||
+            str_contains($normalized, 'authorize gmail') ||
+            str_contains($normalized, 'link gmail') ||
+            str_contains($normalized, 'link my gmail')
+        );
+    }
+
+    private function isHomeCommand(string $normalized): bool
+    {
+        if (
+            !preg_match('/\bhome\b/u', $normalized) &&
+            !str_contains($normalized, 'dashboard')
+        ) {
+            return false;
+        }
+
+        return (
+            $normalized === 'home' ||
+            $normalized === 'dashboard' ||
+            str_contains($normalized, 'go home') ||
+            str_contains($normalized, 'go back home') ||
+            str_contains($normalized, 'go back to home') ||
+            str_contains($normalized, 'return home') ||
+            str_contains($normalized, 'return to home') ||
+            str_contains($normalized, 'back home') ||
+            str_contains($normalized, 'take me home') ||
+            str_contains($normalized, 'open home') ||
+            str_contains($normalized, 'show home') ||
+            str_contains($normalized, 'show me home') ||
+            str_contains($normalized, 'go to home') ||
+            str_contains($normalized, 'go to the home') ||
+            str_contains($normalized, 'open dashboard') ||
+            str_contains($normalized, 'go to dashboard') ||
+            str_contains($normalized, 'show dashboard') ||
+            str_contains($normalized, 'can you take me home') ||
+            str_contains($normalized, 'can you go home') ||
+            str_contains($normalized, 'can you return home') ||
+            str_contains($normalized, 'i want to go home') ||
+            str_contains($normalized, 'i want to return home') ||
+            str_contains($normalized, 'i want home') ||
+            str_contains($normalized, 'bring me home')
+        );
+    }
+
+    private function isProfileCommand(string $normalized): bool
+    {
+        if (!preg_match('/\bprofile\b/u', $normalized)) {
+            return false;
+        }
+
+        return (
+            $normalized === 'profile' ||
+            str_contains($normalized, 'my profile') ||
+            str_contains($normalized, 'open profile') ||
+            str_contains($normalized, 'open my profile') ||
+            str_contains($normalized, 'show profile') ||
+            str_contains($normalized, 'show my profile') ||
+            str_contains($normalized, 'show me my profile') ||
+            str_contains($normalized, 'see profile') ||
+            str_contains($normalized, 'see my profile') ||
+            str_contains($normalized, 'view profile') ||
+            str_contains($normalized, 'view my profile') ||
+            str_contains($normalized, 'go to profile') ||
+            str_contains($normalized, 'go to my profile') ||
+            str_contains($normalized, 'take me to profile') ||
+            str_contains($normalized, 'take me to my profile') ||
+            str_contains($normalized, 'can you show me my profile') ||
+            str_contains($normalized, 'can you open my profile') ||
+            str_contains($normalized, 'can you take me to my profile') ||
+            str_contains($normalized, 'i want to see my profile') ||
+            str_contains($normalized, 'i want to view my profile') ||
+            str_contains($normalized, 'i want my profile') ||
+            str_contains($normalized, 'bring up my profile') ||
+            str_contains($normalized, 'edit profile') ||
+            str_contains($normalized, 'edit my profile') ||
+            str_contains($normalized, 'update profile') ||
+            str_contains($normalized, 'update my profile')
+        );
+    }
+
+    private function isFilesCommand(string $normalized): bool
+    {
+        if (
+            !preg_match('/\bfile\b/u', $normalized) &&
+            !preg_match('/\bfiles\b/u', $normalized)
+        ) {
+            return false;
+        }
+
+        return (
+            $normalized === 'files' ||
+            $normalized === 'my files' ||
+            str_contains($normalized, 'open files') ||
+            str_contains($normalized, 'open my files') ||
+            str_contains($normalized, 'show files') ||
+            str_contains($normalized, 'show my files') ||
+            str_contains($normalized, 'show me my files') ||
+            str_contains($normalized, 'see files') ||
+            str_contains($normalized, 'see my files') ||
+            str_contains($normalized, 'view files') ||
+            str_contains($normalized, 'view my files') ||
+            str_contains($normalized, 'go to files') ||
+            str_contains($normalized, 'go to my files') ||
+            str_contains($normalized, 'take me to files') ||
+            str_contains($normalized, 'take me to my files') ||
+            str_contains($normalized, 'can you show me my files') ||
+            str_contains($normalized, 'can you open my files') ||
+            str_contains($normalized, 'i want to see my files') ||
+            str_contains($normalized, 'i want my files')
+        );
+    }
+
+    private function isVoiceCommandsCommand(string $normalized): bool
+    {
+        return (
+            str_contains($normalized, 'voice commands') ||
+            str_contains($normalized, 'voice command') ||
+            str_contains($normalized, 'voice assistant') ||
+            str_contains($normalized, 'open assistant') ||
+            str_contains($normalized, 'go to assistant') ||
+            str_contains($normalized, 'go to voice assistant') ||
+            str_contains($normalized, 'open voice assistant') ||
+            str_contains($normalized, 'show commands') ||
+            str_contains($normalized, 'available commands') ||
+            str_contains($normalized, 'what can i say') ||
+            str_contains($normalized, 'what can i do')
+        );
+    }
+
+    private function isWebsiteOpenCommand(string $normalized, string $alias): bool
+    {
+        return (
+            $normalized === $alias ||
+            $normalized === 'open ' . $alias ||
+            $normalized === 'go to ' . $alias ||
+            $normalized === 'launch ' . $alias ||
+            $normalized === 'show me ' . $alias ||
+            $normalized === 'take me to ' . $alias ||
+            $normalized === 'i want ' . $alias ||
+            $normalized === 'i want to open ' . $alias ||
+            $normalized === 'i want to go to ' . $alias ||
+            $normalized === 'can you open ' . $alias ||
+            $normalized === 'can you go to ' . $alias ||
+            $normalized === 'please open ' . $alias ||
+            $normalized === 'please go to ' . $alias
+        );
+    }
+
+    private function extractWebsiteSearchQuery(string $normalized, string $alias): ?string
+    {
+        $aliasPattern = preg_quote($alias, '/');
+
+        $patterns = [
+            '/^(?:search|find|look up|play)\s+' . $aliasPattern . '\s+(?:for\s+|gfor\s+|about\s+)?(.+)$/u',
+            '/^(?:search|find|look up|play)\s+on\s+' . $aliasPattern . '\s+(?:for\s+|gfor\s+|about\s+)?(.+)$/u',
+            '/^(?:open|go to|launch)\s+' . $aliasPattern . '\s+(?:then|and)\s+(?:search|find|look up|play)\s+(?:for\s+|gfor\s+|about\s+)?(.+)$/u',
+            '/^(?:open|go to|launch)\s+' . $aliasPattern . '\s+(?:then|and)\s+(?:search|find|look up|play)\s+(.+)$/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized, $matches)) {
+                return $this->cleanSearchQuery($matches[1] ?? null);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractImplicitWebsiteSearch(string $normalized): ?array
+    {
+        $websiteAliases = [
+            'youtube' => ['youtube', 'you tube', 'ytb', 'y t b', 'yt'],
+            'google' => ['google', 'gogle'],
+            'facebook' => ['facebook', 'fb'],
+        ];
+
+        foreach ($websiteAliases as $website => $aliases) {
+            foreach ($aliases as $alias) {
+                $aliasPattern = preg_quote($alias, '/');
+
+                $patterns = [
+                    '/^(?:play|search|find|look up)\s+(.+?)\s+on\s+' . $aliasPattern . '$/u',
+                    '/^(?:play|search|find|look up)\s+on\s+' . $aliasPattern . '\s+(.+)$/u',
+                    '/^(.+?)\s+on\s+' . $aliasPattern . '$/u',
+                    '/^(.+?)\s+in\s+' . $aliasPattern . '$/u',
+                    '/^(.+?)\s+' . $aliasPattern . '$/u',
+                ];
+
+                foreach ($patterns as $pattern) {
+                    if (preg_match($pattern, $normalized, $matches)) {
+                        $query = $this->cleanSearchQuery($matches[1] ?? null);
+
+                        if ($query !== null) {
+                            return [
+                                'website' => $website,
+                                'query' => $query,
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extractCurrentWebsiteSearchQuery(string $normalized): ?string
+    {
+        $patterns = [
+            '/^(?:search|find|look up|play)\s+(?:for\s+|gfor\s+|about\s+)?(.+)$/u',
+            '/^(?:search|find|look up|play)\s+(.+)$/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized, $matches)) {
+                return $this->cleanSearchQuery($matches[1] ?? null);
+            }
+        }
+
+        return null;
+    }
+
+    private function cleanSearchQuery(mixed $query): ?string
+    {
+        if ($query === null || is_array($query) || is_object($query)) {
+            return null;
+        }
+
+        $query = trim((string) $query);
+        $query = preg_replace('/^(for|gfor|about)\s+/i', '', $query) ?? $query;
+        $query = preg_replace('/\s+/', ' ', $query) ?? $query;
+        $query = trim($query);
+
+        if ($query === '') {
+            return null;
+        }
+
+        $blockedQueries = [
+            'youtube',
+            'you tube',
+            'ytb',
+            'y t b',
+            'yt',
+            'google',
+            'facebook',
+            'gmail',
+            'open',
+            'go',
+            'launch',
+            'search',
+            'find',
+            'play',
+        ];
+
+        if (in_array(strtolower($query), $blockedQueries, true)) {
+            return null;
+        }
+
+        return $query;
+    }
+
+    private function detectCurrentWebsiteFromContext(?array $browserContext): ?string
+    {
+        if (!is_array($browserContext)) {
+            return null;
+        }
+
+        $website = strtolower((string) ($browserContext['website'] ?? ''));
+        $url = strtolower((string) ($browserContext['url'] ?? ''));
+
+        $source = $website . ' ' . $url;
+
+        if (str_contains($source, 'youtube.com') || str_contains($source, 'youtube')) {
+            return 'youtube';
+        }
+
+        if (str_contains($source, 'google.com') || str_contains($source, 'google')) {
+            return 'google';
+        }
+
+        if (str_contains($source, 'facebook.com') || str_contains($source, 'facebook')) {
+            return 'facebook';
+        }
+
+        if (str_contains($source, 'mail.google.com') || str_contains($source, 'gmail')) {
+            return 'gmail';
+        }
+
+        return null;
+    }
+
+    private function matchVideoSelectionCommand(string $normalized): ?int
+    {
+        if (
+            !preg_match('/\b(video|result)\b/u', $normalized) &&
+            !preg_match('/\bnumber\b/u', $normalized)
+        ) {
+            return null;
+        }
+
+        if (!preg_match('/\b(open|play|select|click)\b/u', $normalized)) {
+            return null;
+        }
+
+        if (preg_match('/\b(?:video|result)\s+(?:number\s+)?(\d+)\b/u', $normalized, $matches)) {
+            $number = (int) $matches[1];
+
+            return $number > 0 ? $number : null;
+        }
+
+        if (preg_match('/\bnumber\s+(\d+)\b/u', $normalized, $matches)) {
+            $number = (int) $matches[1];
+
+            return $number > 0 ? $number : null;
+        }
+
+        if (preg_match('/\b(?:video|result)\s+(?:number\s+)?([a-z]+)\b/u', $normalized, $matches)) {
+            return $this->spokenNumberToInt($matches[1]);
+        }
+
+        if (preg_match('/\bnumber\s+([a-z]+)\b/u', $normalized, $matches)) {
+            return $this->spokenNumberToInt($matches[1]);
+        }
+
+        return null;
+    }
+
+    private function matchVideoTitleCommand(string $text): ?string
+    {
+        $text = trim($text);
+
+        $patterns = [
+            '/^(?:open|play|select|click)\s+(?:the\s+)?video\s+(?:called|named|titled|title)\s+(.+)$/i',
+            '/^(?:open|play|select|click)\s+(?:the\s+)?(.+?)\s+video$/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches)) {
+                $title = trim($matches[1]);
+
+                if ($title === '') {
+                    continue;
+                }
+
+                $normalizedTitle = $this->normalizeText($title);
+
+                if (
+                    in_array($normalizedTitle, [
+                        'youtube',
+                        'google',
+                        'facebook',
+                        'gmail',
+                        'home',
+                        'profile',
+                        'files',
+                        'settings',
+                    ], true)
+                ) {
+                    continue;
+                }
+
+                return $title;
+            }
+        }
+
+        return null;
+    }
+
+    private function spokenNumberToInt(string $word): ?int
+    {
+        $word = strtolower(trim($word));
+
+        $numbers = [
+            'one' => 1,
+            'first' => 1,
+            'won' => 1,
+            'two' => 2,
+            'second' => 2,
+            'to' => 2,
+            'too' => 2,
+            'three' => 3,
+            'third' => 3,
+            'tree' => 3,
+            'four' => 4,
+            'fourth' => 4,
+            'for' => 4,
+            'five' => 5,
+            'fifth' => 5,
+            'six' => 6,
+            'sixth' => 6,
+            'seven' => 7,
+            'seventh' => 7,
+            'eight' => 8,
+            'eighth' => 8,
+            'ate' => 8,
+            'nine' => 9,
+            'ninth' => 9,
+            'ten' => 10,
+            'tenth' => 10,
+        ];
+
+        return $numbers[$word] ?? null;
+    }
+
+    private function matchBrowserAction(string $normalized): ?string
+    {
+        if (
+            $normalized === 'scroll down' ||
+            $normalized === 'page down' ||
+            $normalized === 'go down' ||
+            $normalized === 'move down' ||
+            $normalized === 'show me more' ||
+            $normalized === 'next part' ||
+            $normalized === 'continue down' ||
+            str_contains($normalized, 'scroll down') ||
+            str_contains($normalized, 'page down') ||
+            str_contains($normalized, 'go down') ||
+            str_contains($normalized, 'move down') ||
+            str_contains($normalized, 'show me more') ||
+            str_contains($normalized, 'scroll more') ||
+            str_contains($normalized, 'you dont scroll down') ||
+            str_contains($normalized, 'you don t scroll down') ||
+            str_contains($normalized, 'you did not scroll down') ||
+            str_contains($normalized, 'you didnt scroll down')
+        ) {
+            return 'SCROLL_DOWN';
+        }
+
+        if (
+            $normalized === 'scroll up' ||
+            $normalized === 'page up' ||
+            $normalized === 'go up' ||
+            $normalized === 'move up' ||
+            $normalized === 'previous part' ||
+            $normalized === 'back up' ||
+            str_contains($normalized, 'scroll up') ||
+            str_contains($normalized, 'page up') ||
+            str_contains($normalized, 'go up') ||
+            str_contains($normalized, 'move up') ||
+            str_contains($normalized, 'back up')
+        ) {
+            return 'SCROLL_UP';
+        }
+
+        if (
+            $normalized === 'go back' ||
+            $normalized === 'back' ||
+            $normalized === 'previous page' ||
+            $normalized === 'return back' ||
+            $normalized === 'go to previous page' ||
+            str_contains($normalized, 'go back') ||
+            str_contains($normalized, 'previous page')
+        ) {
+            return 'GO_BACK';
+        }
+
+        if (
+            $normalized === 'go forward' ||
+            $normalized === 'forward' ||
+            $normalized === 'next page' ||
+            str_contains($normalized, 'go forward')
+        ) {
+            return 'GO_FORWARD';
+        }
+
+        if (
+            $normalized === 'play' ||
+            $normalized === 'play video' ||
+            $normalized === 'start video' ||
+            $normalized === 'resume video' ||
+            $normalized === 'continue video' ||
+            str_contains($normalized, 'play video') ||
+            str_contains($normalized, 'resume video')
+        ) {
+            return 'PLAY_VIDEO';
+        }
+
+        if (
+            $normalized === 'pause' ||
+            $normalized === 'pause video' ||
+            $normalized === 'stop video' ||
+            $normalized === 'stop the video' ||
+            str_contains($normalized, 'pause video') ||
+            str_contains($normalized, 'stop video')
+        ) {
+            return 'PAUSE_VIDEO';
+        }
+
+        if (
+            $normalized === 'mute' ||
+            $normalized === 'mute video' ||
+            $normalized === 'turn sound off' ||
+            $normalized === 'sound off' ||
+            str_contains($normalized, 'mute video') ||
+            str_contains($normalized, 'turn sound off')
+        ) {
+            return 'MUTE';
+        }
+
+        if (
+            $normalized === 'unmute' ||
+            $normalized === 'unmute video' ||
+            $normalized === 'turn sound on' ||
+            $normalized === 'sound on' ||
+            str_contains($normalized, 'unmute video') ||
+            str_contains($normalized, 'turn sound on')
+        ) {
+            return 'UNMUTE';
+        }
+
+        if (
+            $normalized === 'volume up' ||
+            $normalized === 'increase volume' ||
+            $normalized === 'turn volume up' ||
+            $normalized === 'make it louder' ||
+            str_contains($normalized, 'volume up') ||
+            str_contains($normalized, 'increase volume')
+        ) {
+            return 'VOLUME_UP';
+        }
+
+        if (
+            $normalized === 'volume down' ||
+            $normalized === 'decrease volume' ||
+            $normalized === 'turn volume down' ||
+            $normalized === 'make it quieter' ||
+            str_contains($normalized, 'volume down') ||
+            str_contains($normalized, 'decrease volume')
+        ) {
+            return 'VOLUME_DOWN';
+        }
+
+        if (
+            $normalized === 'read page' ||
+            $normalized === 'read this page' ||
+            $normalized === 'read the page' ||
+            $normalized === 'read it' ||
+            str_contains($normalized, 'read this page') ||
+            str_contains($normalized, 'read the page')
+        ) {
+            return 'READ_PAGE';
+        }
+
+        if (
+            $normalized === 'summarize page' ||
+            $normalized === 'summarize this page' ||
+            $normalized === 'summarize the page' ||
+            $normalized === 'summary' ||
+            $normalized === 'give me a summary' ||
+            str_contains($normalized, 'summarize this page') ||
+            str_contains($normalized, 'give me a summary')
+        ) {
+            return 'SUMMARIZE_PAGE';
+        }
+
+        if (
+            $normalized === 'return to assistant' ||
+            $normalized === 'go back to assistant' ||
+            $normalized === 'open assistant tab' ||
+            $normalized === 'focus assistant'
+        ) {
+            return 'RETURN_TO_ASSISTANT';
+        }
+
+        return null;
+    }
+
+    private function buildDeleteAccountResponse(string $baseUrl): array
+    {
+        $deleteUrl = $this->tryGenerateFirstAvailableLocalAppUrl([
+            'front_delete_account',
+            'front_account_delete',
+            'app_delete_account',
+            'app_account_delete',
+            'account_delete',
+            'delete_account',
+            'user_delete_account',
+            'profile_delete_account',
+        ], $baseUrl);
+
+        if ($deleteUrl !== null) {
+            return $this->buildAppNavigationAction(
+                $deleteUrl,
+                'Opening the account deletion page.',
+                'LOCAL_APP_DELETE_ACCOUNT'
+            );
+        }
 
         return [
-            'success' => true,
-            'intent' => 'BROWSER_ACTION',
-            'mode' => 'LOCAL_OR_LLM_BROWSER_ACTION',
-            'requiresExtension' => true,
-            'extensionCommand' => [
-                'action' => $this->normalizeBrowserAction($llmResult['action'] ?? null),
-                'website' => $llmResult['website'] ?? null,
-                'query' => $llmResult['query'] ?? null,
-                'target' => $llmResult['target'] ?? null,
-                'resultPosition' => $resultPosition,
-                'nextAction' => $this->normalizeNextAction($llmResult['nextAction'] ?? null),
-                'language' => $language,
-                'context' => is_array($browserContext) ? $browserContext : null,
-            ],
-            'message' => $llmResult['speech'] ?? 'I will execute this action in the browser.',
-            'speech' => $llmResult['speech'] ?? 'I will execute this action in the browser.',
-            'confidence' => $llmResult['confidence'] ?? null,
-            'reason' => $llmResult['reason'] ?? null,
+            'success' => false,
+            'intent' => 'APP_NAVIGATION',
+            'mode' => 'DELETE_ACCOUNT_NOT_CONNECTED',
+            'requiresExtension' => false,
+            'message' => 'Account deletion is not connected in this app yet. I will not invent a Settings or Security page. Please add a delete-account route first, or delete the account manually from the admin side.',
+            'speech' => 'Account deletion is not connected in this app yet. I will not invent a Settings or Security page. Please add a delete-account route first, or delete the account manually from the admin side.',
         ];
     }
 
-    private function buildWebsiteActionResult(array $llmResult, string $language, mixed $browserContext): array
+    private function buildChangePasswordResponse(string $baseUrl): array
     {
-        $website = strtolower(trim((string) ($llmResult['website'] ?? '')));
-        $action = strtolower(trim((string) ($llmResult['action'] ?? '')));
-        $query = isset($llmResult['query']) ? trim((string) $llmResult['query']) : null;
-        $resultPosition = $this->normalizeResultPosition($llmResult['resultPosition'] ?? null);
+        $changePasswordUrl = $this->tryGenerateFirstAvailableLocalAppUrl([
+            'front_change_password',
+            'front_profile_change_password',
+            'app_change_password',
+            'change_password',
+            'profile_change_password',
+            'user_change_password',
+            'app_forgot_password_request',
+        ], $baseUrl);
+
+        if ($changePasswordUrl !== null) {
+            return $this->buildAppNavigationAction(
+                $changePasswordUrl,
+                'Opening the password section.',
+                'LOCAL_APP_CHANGE_PASSWORD'
+            );
+        }
+
+        return $this->buildAppNavigationAction(
+            $this->buildFirstAvailableLocalAppUrl(['front_profile', 'app_profile', 'profile'], '/front/profile', $baseUrl),
+            'There is no separate password page connected yet. Opening your profile.',
+            'LOCAL_APP_CHANGE_PASSWORD_FALLBACK'
+        );
+    }
+
+    private function buildSettingsResponse(string $baseUrl): array
+    {
+        $settingsUrl = $this->tryGenerateFirstAvailableLocalAppUrl([
+            'front_settings',
+            'app_settings',
+            'user_settings',
+            'account_settings',
+            'front_profile',
+        ], $baseUrl);
+
+        if ($settingsUrl !== null) {
+            return $this->buildAppNavigationAction(
+                $settingsUrl,
+                'Opening your account page.',
+                'LOCAL_APP_SETTINGS'
+            );
+        }
+
+        return $this->buildAppNavigationAction(
+            $baseUrl . '/front/profile',
+            'There is no settings page connected yet. Opening your profile.',
+            'LOCAL_APP_SETTINGS_FALLBACK'
+        );
+    }
+
+    private function buildAppNavigationAction(string $url, string $speech, string $mode): array
+    {
+        return [
+            'success' => true,
+            'intent' => 'APP_NAVIGATION',
+            'mode' => $mode,
+            'requiresExtension' => false,
+            'action' => 'NAVIGATE',
+            'url' => $url,
+            'message' => $speech,
+            'speech' => $speech,
+            'frontendAction' => [
+                'type' => 'NAVIGATE',
+                'url' => $url,
+            ],
+        ];
+    }
+
+    private function buildLocalMessageAction(string $mode, string $message, string $speech): array
+    {
+        return [
+            'success' => true,
+            'intent' => 'APP_MESSAGE',
+            'mode' => $mode,
+            'requiresExtension' => false,
+            'message' => $message,
+            'speech' => $speech,
+        ];
+    }
+
+    private function buildWebsiteAction(
+        string $action,
+        ?string $website,
+        ?string $url,
+        ?string $query,
+        string $speech,
+        string $language,
+        ?array $browserContext,
+        string $mode,
+        mixed $confidence = null,
+        mixed $reason = null
+    ): array {
+        $action = $this->normalizeWebsiteAction($action);
+        $website = $website !== null ? strtolower($website) : null;
 
         $allowedWebsites = ['youtube', 'google', 'facebook', 'gmail'];
-        $allowedActions = ['open', 'open_url', 'search', 'search_url'];
 
-        if (!in_array($website, $allowedWebsites, true)) {
+        if ($website !== null && !in_array($website, $allowedWebsites, true)) {
             return [
                 'success' => false,
                 'intent' => 'WEBSITE_ACTION',
@@ -247,1163 +1257,239 @@ class ApiVoiceController extends AbstractController
                 'requiresExtension' => false,
                 'message' => 'This website is not allowed.',
                 'speech' => 'This website is not allowed.',
-                'website' => $website ?: null,
+                'confidence' => $confidence,
+                'reason' => $reason,
             ];
         }
 
-        if (!in_array($action, $allowedActions, true)) {
+        if ($website === null && $url === null) {
             return [
                 'success' => false,
                 'intent' => 'WEBSITE_ACTION',
-                'mode' => 'WEBSITE_ACTION_NOT_ALLOWED',
+                'mode' => 'MISSING_WEBSITE',
                 'requiresExtension' => false,
-                'message' => 'This website action is not allowed.',
-                'speech' => 'This website action is not allowed.',
-                'website' => $website,
-                'action' => $action ?: null,
+                'message' => 'Website is missing.',
+                'speech' => 'Website is missing.',
+                'confidence' => $confidence,
+                'reason' => $reason,
             ];
         }
 
-        $url = $this->buildExternalWebsiteUrl($website, $action, $query);
+        if ($action === 'SEARCH' && ($query === null || trim($query) === '')) {
+            return [
+                'success' => false,
+                'intent' => 'WEBSITE_ACTION',
+                'mode' => 'MISSING_SEARCH_QUERY',
+                'requiresExtension' => false,
+                'message' => 'Search query is missing.',
+                'speech' => 'Search query is missing.',
+                'confidence' => $confidence,
+                'reason' => $reason,
+            ];
+        }
 
         return [
             'success' => true,
             'intent' => 'WEBSITE_ACTION',
-            'mode' => 'LOCAL_OR_LLM_WEBSITE_ACTION',
+            'mode' => $mode,
             'requiresExtension' => true,
             'website' => $website,
-            'websiteName' => ucfirst($website),
             'action' => $action,
             'query' => $query,
             'url' => $url,
-            'resultPosition' => $resultPosition,
-            'language' => $language,
+            'message' => $speech,
+            'speech' => $speech,
+            'confidence' => $confidence,
+            'reason' => $reason,
             'extensionCommand' => [
-                'action' => $this->normalizeWebsiteActionForExtension($action),
+                'action' => $action,
                 'website' => $website,
-                'websiteName' => ucfirst($website),
                 'url' => $url,
                 'query' => $query,
-                'target' => null,
-                'resultPosition' => $resultPosition,
-                'nextAction' => $this->normalizeNextAction($llmResult['nextAction'] ?? null),
                 'language' => $language,
-                'context' => is_array($browserContext) ? $browserContext : null,
+                'context' => $browserContext,
             ],
-            'message' => $llmResult['speech'] ?? ($action === 'search' ? 'Searching website.' : 'Opening website.'),
-            'speech' => $llmResult['speech'] ?? ($action === 'search' ? 'Searching website.' : 'Opening website.'),
-            'confidence' => $llmResult['confidence'] ?? null,
-            'reason' => $llmResult['reason'] ?? null,
         ];
     }
 
-    private function handlePendingEmailCancellationCommand(
-        string $spokenText,
-        RequestStack $requestStack,
-        AiCommandLogService $aiCommandLogService,
-        ?int $userId
-    ): ?array {
-        $session = $requestStack->getSession();
-        $hasPendingEmail = is_array($session->get('pending_email_to_send')) || is_array($session->get('pending_email_missing_body'));
-
-        if (!$hasPendingEmail) {
-            return null;
-        }
-
-        $normalized = mb_strtolower(trim($spokenText));
-
-        if (!$this->looksLikeEmailCancellation($normalized)) {
-            return null;
-        }
-
-        $session->remove('pending_email_to_send');
-        $session->remove('pending_email_missing_body');
-
-        $result = [
-            'success' => true,
-            'intent' => 'EMAIL_ACTION',
-            'mode' => 'EMAIL_CANCELLED',
-            'message' => 'Email preparation cancelled.',
-            'speech' => 'Email preparation cancelled.',
-        ];
-
-        $aiCommandLogService->log($spokenText, $result, $userId);
-
-        return $result;
-    }
-
-    private function completePendingEmailBodyCommand(
-        string $spokenText,
+    private function buildBrowserAction(
+        string $action,
+        ?string $query,
+        ?string $target,
+        ?int $resultPosition,
+        string $speech,
         string $language,
-        RequestStack $requestStack,
-        AiCommandLogService $aiCommandLogService,
-        ?int $userId
-    ): ?array {
-        $session = $requestStack->getSession();
-        $pendingDraft = $session->get('pending_email_missing_body');
-
-        if (!is_array($pendingDraft)) {
-            return null;
-        }
-
-        $text = trim($spokenText);
-        $normalized = mb_strtolower($text);
-
-        if ($text === '') {
-            return null;
-        }
-
-        if ($this->looksLikeEmailCancellation($normalized)) {
-            $session->remove('pending_email_missing_body');
-            $session->remove('pending_email_to_send');
-
-            $result = [
-                'success' => true,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_CANCELLED',
-                'message' => 'Email preparation cancelled.',
-                'speech' => 'Email preparation cancelled.',
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        if ($this->looksLikeEmailCommand($normalized) && !$this->looksLikeEmailConfirmation($normalized)) {
-            $session->remove('pending_email_missing_body');
-            return null;
-        }
-
-        if ($this->looksLikeEmailConfirmation($normalized)) {
-            $result = [
-                'success' => false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_MISSING_BODY',
-                'message' => 'Please say the email message first. What should the email say?',
-                'speech' => 'Please say the email message first. What should the email say?',
-                'requiresEmailBody' => true,
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        $to = $this->normalizeSpokenEmailAddress((string) ($pendingDraft['to'] ?? ''));
-        $subject = trim((string) ($pendingDraft['subject'] ?? 'Message from voice assistant'));
-        $body = $this->cleanEmailBodyText($text);
-
-        if ($subject === '') {
-            $subject = $this->generateEmailSubject($body);
-        }
-
-        $session->remove('pending_email_missing_body');
-        $session->set('pending_email_to_send', [
-            'to' => $to,
-            'subject' => $subject,
-            'body' => $body,
-        ]);
-
-        $result = [
-            'success' => true,
-            'intent' => 'EMAIL_ACTION',
-            'mode' => 'EMAIL_PREPARED_NEEDS_CONFIRMATION',
-            'requiresConfirmation' => true,
-            'message' => sprintf(
-                'I prepared an email to %s with subject "%s". Say confirm send email to send it.',
-                $to,
-                $subject
-            ),
-            'speech' => sprintf(
-                'I prepared an email to %s. Say confirm send email to send it.',
-                $to
-            ),
-            'emailPreview' => [
-                'to' => $to,
-                'subject' => $subject,
-                'body' => $body,
-            ],
-        ];
-
-        $aiCommandLogService->log($spokenText, $result, $userId);
-
-        return $result;
-    }
-
-    private function handleEmailAction(
-        array $llmResult,
-        string $spokenText,
-        ?int $userId,
-        RequestStack $requestStack,
-        AiCommandLogService $aiCommandLogService,
-        GmailService $gmailService
+        ?array $browserContext,
+        string $mode,
+        mixed $confidence = null,
+        mixed $reason = null
     ): array {
-        $session = $requestStack->getSession();
-        $action = strtoupper((string) ($llmResult['action'] ?? ''));
+        $action = $this->normalizeBrowserAction($action);
 
-        if ($action !== 'SEND_PENDING_EMAIL') {
-            $session->remove('pending_email_to_send');
-        }
-
-        if ($action === 'SEND_PENDING_EMAIL') {
-            $pendingEmail = $session->get('pending_email_to_send');
-
-            if (!is_array($pendingEmail)) {
-                $result = [
-                    'success' => false,
-                    'intent' => 'EMAIL_ACTION',
-                    'mode' => 'EMAIL_NO_PENDING_MESSAGE',
-                    'message' => 'There is no pending email to send.',
-                    'speech' => 'There is no pending email to send.',
-                ];
-
-                $aiCommandLogService->log($spokenText, $result, $userId);
-
-                return $result;
-            }
-
-            $sendResult = $gmailService->sendEmail(
-                $pendingEmail['to'],
-                $pendingEmail['subject'],
-                $pendingEmail['body']
-            );
-
-            if (($sendResult['success'] ?? false) === true) {
-                $session->remove('pending_email_to_send');
-            }
-
-            $result = [
-                'success' => $sendResult['success'] ?? false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_SEND_CONFIRMED',
-                'message' => $sendResult['message'] ?? 'Email send attempted.',
-                'speech' => $sendResult['message'] ?? 'Email send attempted.',
-                'connectUrl' => $sendResult['connectUrl'] ?? null,
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        $email = $llmResult['email'] ?? null;
-
-        if (!is_array($email)) {
-            $result = [
-                'success' => false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_MISSING_DETAILS',
-                'message' => 'I need the recipient and message before preparing an email.',
-                'speech' => 'I need the recipient and message before preparing an email.',
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        $to = $this->normalizeSpokenEmailAddress((string) ($email['to'] ?? ''));
-        $subject = trim((string) ($email['subject'] ?? ''));
-        $body = $this->cleanEmailBodyText((string) ($email['body'] ?? ''));
-
-        if ($to === '') {
-            $result = [
-                'success' => false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_MISSING_RECIPIENT',
-                'message' => $llmResult['speech'] ?? 'Who should I send the email to? Please give me the email address.',
-                'speech' => $llmResult['speech'] ?? 'Who should I send the email to? Please give me the email address.',
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
-            $result = [
-                'success' => false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_INVALID_RECIPIENT',
-                'message' => 'The recipient email address is not valid.',
-                'speech' => 'The recipient email address is not valid. Please try again. Say it like name at gmail dot com.',
-                'emailPreview' => [
-                    'to' => $to,
-                    'subject' => $subject,
-                    'body' => $body,
-                ],
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        if ($body === '') {
-            $session->set('pending_email_missing_body', [
-                'to' => $to,
-                'subject' => $subject !== '' ? $subject : 'Message from voice assistant',
-            ]);
-
-            $result = [
-                'success' => false,
-                'intent' => 'EMAIL_ACTION',
-                'mode' => 'EMAIL_MISSING_BODY',
-                'message' => $llmResult['speech'] ?? 'What should the email say?',
-                'speech' => $llmResult['speech'] ?? 'What should the email say?',
-                'requiresEmailBody' => true,
-                'emailPreview' => [
-                    'to' => $to,
-                    'subject' => $subject !== '' ? $subject : 'Message from voice assistant',
-                    'body' => '',
-                ],
-            ];
-
-            $aiCommandLogService->log($spokenText, $result, $userId);
-
-            return $result;
-        }
-
-        if ($subject === '') {
-            $subject = 'Message from voice assistant';
-        }
-
-        $session->set('pending_email_to_send', [
-            'to' => $to,
-            'subject' => $subject,
-            'body' => $body,
-        ]);
-
-        $result = [
-            'success' => true,
-            'intent' => 'EMAIL_ACTION',
-            'mode' => 'EMAIL_PREPARED_NEEDS_CONFIRMATION',
-            'requiresConfirmation' => true,
-            'message' => sprintf(
-                'I prepared an email to %s with subject "%s". Say confirm send email to send it.',
-                $to,
-                $subject
-            ),
-            'speech' => sprintf(
-                'I prepared an email to %s. Say confirm send email to send it.',
-                $to
-            ),
-            'emailPreview' => [
-                'to' => $to,
-                'subject' => $subject,
-                'body' => $body,
-            ],
-        ];
-
-        $aiCommandLogService->log($spokenText, $result, $userId);
-
-        return $result;
-    }
-
-    private function getAllowedExternalActionsForLlm(): array
-    {
-        return [
-            'websites' => [
-                ['website' => 'youtube', 'name' => 'YouTube', 'actions' => ['open', 'search']],
-                ['website' => 'google', 'name' => 'Google', 'actions' => ['open', 'search']],
-                ['website' => 'facebook', 'name' => 'Facebook', 'actions' => ['open', 'search']],
-                ['website' => 'gmail', 'name' => 'Gmail', 'actions' => ['open']],
-            ],
-            'browserActions' => [
-                'CLICK',
-                'TYPE',
-                'READ_PAGE',
-                'SUMMARIZE_PAGE',
-                'SCROLL_DOWN',
-                'SCROLL_UP',
-                'GO_BACK',
-                'GO_FORWARD',
-                'PLAY_VIDEO',
-                'PAUSE_VIDEO',
-                'MUTE',
-                'UNMUTE',
-                'VOLUME_UP',
-                'VOLUME_DOWN',
-                'SELECT_RESULT',
-                'SWITCH_TO_ASSISTANT',
-            ],
-            'emailActions' => [
-                'PREPARE_EMAIL',
-                'SEND_PENDING_EMAIL',
-            ],
-        ];
-    }
-
-    private function tryLocalEmailCommand(string $spokenText, string $language): ?array
-    {
-        $text = mb_strtolower(trim($spokenText));
-
-        if (!$this->looksLikeEmailCommand($text)) {
-            return null;
-        }
-
-        if ($this->looksLikeEmailConfirmation($text)) {
+        if ($action === '') {
             return [
-                'intent' => 'EMAIL_ACTION',
-                'website' => null,
-                'action' => 'SEND_PENDING_EMAIL',
-                'query' => null,
-                'target' => null,
-                'resultPosition' => null,
-                'nextAction' => null,
-                'email' => null,
-                'confidence' => 0.95,
+                'success' => false,
+                'intent' => 'BROWSER_ACTION',
+                'mode' => 'MISSING_BROWSER_ACTION',
                 'requiresExtension' => false,
-                'speech' => $this->emailSpeech('Sending the pending email.', $language),
-                'reason' => 'Local fallback recognized email confirmation.',
+                'message' => 'Browser action is missing.',
+                'speech' => 'Browser action is missing.',
+                'confidence' => $confidence,
+                'reason' => $reason,
             ];
         }
 
-        $emailAddress = $this->extractEmailAddressFromSpeech($spokenText);
-        $body = $this->extractEmailBodyFromSpeech($spokenText);
-        $subject = $body !== '' ? $this->generateEmailSubject($body) : 'Message from voice assistant';
-
         return [
-            'intent' => 'EMAIL_ACTION',
-            'website' => null,
-            'action' => 'PREPARE_EMAIL',
-            'query' => null,
-            'target' => null,
-            'resultPosition' => null,
-            'nextAction' => null,
-            'email' => [
-                'to' => $emailAddress,
-                'recipientName' => null,
-                'subject' => $subject,
-                'body' => $body,
-                'requiresConfirmation' => true,
-            ],
-            'confidence' => 0.78,
-            'requiresExtension' => false,
-            'speech' => $emailAddress === ''
-                ? $this->emailSpeech('I need the recipient email address. Say it like name at gmail dot com.', $language)
-                : ($body === ''
-                    ? $this->emailSpeech('What should the email say?', $language)
-                    : $this->emailSpeech('I prepared the email. Say confirm send email to send it.', $language)),
-            'reason' => 'Local fallback recognized email preparation command.',
-        ];
-    }
-
-    private function tryLocalExternalCommand(string $spokenText, string $language, mixed $browserContext): ?array
-    {
-        $text = mb_strtolower(trim($spokenText));
-
-        /*
-         * 1. Browser/page commands first.
-         * Never let memory convert "scroll down in Gmail" into "open Gmail".
-         */
-        $localBrowserAction = $this->detectLocalBrowserAction($text);
-
-        if ($localBrowserAction !== null) {
-            return $this->buildBrowserActionResult([
-                'intent' => 'BROWSER_ACTION',
-                'website' => $this->detectWebsiteFromBrowserContext($browserContext),
-                'action' => $localBrowserAction,
-                'query' => null,
-                'target' => $this->targetForLocalBrowserAction($localBrowserAction),
-                'resultPosition' => null,
-                'nextAction' => null,
-                'speech' => $this->localBrowserSpeech($localBrowserAction, $language),
-                'confidence' => 0.92,
-                'reason' => 'Local fallback recognized a browser page control command.',
-            ], $language, $browserContext);
-        }
-
-        /*
-         * 2. Email commands must not become website commands.
-         */
-        if ($this->looksLikeEmailCommand($text)) {
-            return null;
-        }
-
-        /*
-         * 3. Website open/search fallback.
-         */
-        $explicitWebsite = $this->detectWebsiteFromText($text);
-        $contextWebsite = $this->detectWebsiteFromBrowserContext($browserContext);
-        $website = $explicitWebsite;
-
-        $isSearch = $this->looksLikeSearchCommand($text);
-
-        if ($website === null && $isSearch) {
-            $website = $contextWebsite;
-        }
-
-        if ($website === null) {
-            return null;
-        }
-
-        if ($website === 'youtube' && $this->looksLikeOpenVideoByName($text)) {
-            $videoTitle = $this->extractVideoTitleQuery($spokenText);
-
-            if ($videoTitle !== '') {
-                return $this->buildWebsiteActionResult([
-                    'intent' => 'WEBSITE_ACTION',
-                    'website' => 'youtube',
-                    'action' => 'search',
-                    'query' => $videoTitle,
-                    'resultPosition' => null,
-                    'nextAction' => [
-                        'intent' => 'BROWSER_ACTION',
-                        'action' => 'CLICK',
-                        'target' => $videoTitle,
-                        'resultPosition' => null,
-                    ],
-                    'speech' => $this->localSpeech(
-                        'Searching YouTube for ' . $videoTitle . ', then I will open the matching video.',
-                        $language,
-                        ['website' => 'youtube', 'query' => $videoTitle, 'type' => 'open_video_by_name']
-                    ),
-                    'confidence' => 0.88,
-                    'reason' => 'Local fallback recognized a YouTube video opening command by title.',
-                ], $language, $browserContext);
-            }
-        }
-
-        if ($website === 'gmail') {
-            return $this->buildWebsiteActionResult([
-                'intent' => 'WEBSITE_ACTION',
-                'website' => 'gmail',
-                'action' => 'open',
-                'query' => null,
-                'resultPosition' => null,
-                'nextAction' => null,
-                'speech' => $this->localSpeech(
-                    'Opening Gmail.',
-                    $language,
-                    ['website' => 'gmail', 'type' => 'open']
-                ),
-                'confidence' => 0.86,
-                'reason' => 'Local fallback recognized Gmail opening command.',
-            ], $language, $browserContext);
-        }
-
-        if (!$isSearch) {
-            if ($explicitWebsite === null) {
-                return null;
-            }
-
-            return $this->buildWebsiteActionResult([
-                'intent' => 'WEBSITE_ACTION',
-                'website' => $website,
-                'action' => 'open',
-                'query' => null,
-                'resultPosition' => null,
-                'nextAction' => null,
-                'speech' => $this->localSpeech(
-                    'Opening ' . ucfirst($website) . '.',
-                    $language,
-                    ['website' => $website, 'type' => 'open']
-                ),
-                'confidence' => 0.86,
-                'reason' => 'Local fallback recognized explicit website opening command.',
-            ], $language, $browserContext);
-        }
-
-        $query = $this->extractLocalSearchQuery($spokenText);
-
-        if ($query === '') {
-            return null;
-        }
-
-        return $this->buildWebsiteActionResult([
-            'intent' => 'WEBSITE_ACTION',
-            'website' => $website,
-            'action' => 'search',
-            'query' => $query,
-            'resultPosition' => null,
-            'nextAction' => null,
-            'speech' => $this->localSpeech(
-                'Searching ' . ucfirst($website) . ' for ' . $query . '.',
-                $language,
-                ['website' => $website, 'query' => $query, 'type' => 'search']
-            ),
-            'confidence' => 0.84,
-            'reason' => 'Local fallback recognized website search command.',
-        ], $language, $browserContext);
-    }
-
-    private function looksLikeEmailCommand(string $text): bool
-    {
-        return (
-            str_contains($text, 'send email') ||
-            str_contains($text, 'send an email') ||
-            str_contains($text, 'write email') ||
-            str_contains($text, 'write an email') ||
-            str_contains($text, 'compose email') ||
-            str_contains($text, 'compose an email') ||
-            str_starts_with($text, 'email ') ||
-            str_contains($text, ' email ') ||
-            str_contains($text, ' e-mail ') ||
-            str_contains($text, 'confirm send email') ||
-            str_contains($text, 'send the pending email') ||
-            str_contains($text, 'yes send it') ||
-            str_contains($text, 'confirm it') ||
-            $text === 'confirm' ||
-            $text === 'i confirm' ||
-            str_contains($text, 'i confirm send it') ||
-            str_contains($text, 'confirm send it') ||
-            str_contains($text, 'send it now') ||
-            $text === 'send it' ||
-            str_contains($text, 'envoyer un email') ||
-            str_contains($text, 'envoie un email') ||
-            str_contains($text, 'ecris un email') ||
-            str_contains($text, 'écris un email') ||
-            str_contains($text, 'confirme l envoi') ||
-            str_contains($text, 'اكتب ايميل') ||
-            str_contains($text, 'ارسل ايميل') ||
-            str_contains($text, 'ابعث ايميل')
-        );
-    }
-
-    private function looksLikeEmailCancellation(string $text): bool
-    {
-        return (
-            str_contains($text, 'cancel') ||
-            str_contains($text, 'do not send') ||
-            str_contains($text, "don't send") ||
-            str_contains($text, 'dont send') ||
-            str_contains($text, 'not confirming') ||
-            str_contains($text, 'no confirm') ||
-            str_contains($text, 'no i am not confirming') ||
-            str_contains($text, "no i'm not confirming") ||
-            str_contains($text, 'stop email') ||
-            str_contains($text, 'annuler') ||
-            str_contains($text, 'ne pas envoyer') ||
-            str_contains($text, 'الغاء') ||
-            str_contains($text, 'إلغاء') ||
-            str_contains($text, 'لا ترسل')
-        );
-    }
-
-    private function looksLikeEmailConfirmation(string $text): bool
-    {
-        return (
-            str_contains($text, 'confirm send email') ||
-            str_contains($text, 'send the pending email') ||
-            str_contains($text, 'yes send it') ||
-            str_contains($text, 'confirm it') ||
-            $text === 'confirm' ||
-            $text === 'i confirm' ||
-            str_contains($text, 'i confirm send it') ||
-            str_contains($text, 'confirm send it') ||
-            str_contains($text, 'send it now') ||
-            $text === 'send it' ||
-            str_contains($text, 'confirme l envoi') ||
-            str_contains($text, 'ارسل الرسالة') ||
-            str_contains($text, 'ابعث الرسالة')
-        );
-    }
-
-    private function extractEmailAddressFromSpeech(string $spokenText): string
-    {
-        $text = trim($spokenText);
-
-        $patterns = [
-            '/send\s+an\s+email\s+to\s+/i',
-            '/send\s+email\s+to\s+/i',
-            '/write\s+an\s+email\s+to\s+/i',
-            '/write\s+email\s+to\s+/i',
-            '/compose\s+an\s+email\s+to\s+/i',
-            '/compose\s+email\s+to\s+/i',
-            '/email\s+/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            $text = preg_replace($pattern, '', $text, 1);
-        }
-
-        $parts = preg_split('/\s+saying\s+|\s+that\s+says\s+|\s+message\s+|\s+body\s+/i', (string) $text);
-        $candidate = trim((string) ($parts[0] ?? ''));
-        $candidate = preg_replace('/\s+(?:to\s+)?gmail\s+a\s+gmail\.com$/i', ' gmail.com', $candidate) ?? $candidate;
-        $candidate = preg_replace('/\s+(?:to\s+)?gmail\s+at\s+gmail\.com$/i', ' gmail.com', $candidate) ?? $candidate;
-
-        return $this->normalizeSpokenEmailAddress($candidate);
-    }
-
-    private function normalizeSpokenEmailAddress(string $value): string
-    {
-        $email = mb_strtolower(trim($value));
-        $email = preg_replace('/\b(?:to\s+)?gmail\s+a\s+gmail\.com\b/u', ' gmail.com', $email) ?? $email;
-        $email = preg_replace('/\b(?:to\s+)?gmail\s+at\s+gmail\.com\b/u', ' gmail.com', $email) ?? $email;
-
-        $email = str_replace([' at ', ' arobase ', ' underscore ', ' dash ', ' hyphen '], ['@', '@', '_', '-', '-'], $email);
-        $email = str_replace([' dot ', ' point ', ' period '], '.', $email);
-        $email = preg_replace('/\s+/', '', $email);
-        $email = str_replace(['،', ','], '.', (string) $email);
-
-        /*
-         * Handle common speech case:
-         * "kimo abdullah gmail.com" -> "kimoabdullah@gmail.com"
-         */
-        if (!str_contains($email, '@')) {
-            $providers = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com'];
-
-            foreach ($providers as $provider) {
-                if (str_ends_with($email, $provider)) {
-                    $local = substr($email, 0, -strlen($provider));
-                    $local = trim($local, '.');
-                    $local = preg_replace('/(?:to)?gmaila$/', '', $local) ?? $local;
-
-                    if ($local !== '') {
-                        return $local . '@' . $provider;
-                    }
-                }
-            }
-        }
-
-        return $email;
-    }
-
-    private function extractEmailBodyFromSpeech(string $spokenText): string
-    {
-        $parts = preg_split('/\s+saying\s+|\s+that\s+says\s+|\s+message\s+|\s+body\s+/i', $spokenText, 2);
-
-        if (!is_array($parts) || count($parts) < 2) {
-            return '';
-        }
-
-        return $this->cleanEmailBodyText((string) $parts[1]);
-    }
-
-    private function cleanEmailBodyText(string $body): string
-    {
-        $body = trim($body);
-        $body = preg_replace('/^(please\s+)?(?:say|saying|write|tell\s+them|message\s+is|body\s+is)\s+/i', '', $body) ?? $body;
-
-        return trim($body);
-    }
-
-    private function generateEmailSubject(string $body): string
-    {
-        $body = trim($body);
-
-        if ($body === '') {
-            return 'Message from voice assistant';
-        }
-
-        $words = preg_split('/\s+/', $body);
-        $short = implode(' ', array_slice($words ?: [], 0, 5));
-
-        return ucfirst($short);
-    }
-
-    private function emailSpeech(string $englishSpeech, string $language): string
-    {
-        if ($language === 'fr-FR') {
-            return match ($englishSpeech) {
-                'I need the recipient email address. Say it like name at gmail dot com.' => 'J’ai besoin de l’adresse email du destinataire. Dites-la comme nom arobase gmail point com.',
-                'What should the email say?' => 'Que doit dire l’email ?',
-                'I prepared the email. Say confirm send email to send it.' => 'J’ai préparé l’email. Dites confirmer l’envoi pour l’envoyer.',
-                'Sending the pending email.' => 'J’envoie l’email en attente.',
-                default => $englishSpeech,
-            };
-        }
-
-        if ($language === 'ar-SA' || $language === 'ar-TN') {
-            return match ($englishSpeech) {
-                'I need the recipient email address. Say it like name at gmail dot com.' => 'أحتاج إلى عنوان البريد الإلكتروني للمستلم.',
-                'What should the email say?' => 'ماذا يجب أن أكتب في البريد؟',
-                'I prepared the email. Say confirm send email to send it.' => 'حضّرت البريد الإلكتروني. قل تأكيد الإرسال لإرساله.',
-                'Sending the pending email.' => 'سأرسل البريد الإلكتروني المعلّق.',
-                default => $englishSpeech,
-            };
-        }
-
-        return $englishSpeech;
-    }
-
-    private function detectWebsiteFromText(string $text): ?string
-    {
-        if (str_contains($text, 'youtube') || str_contains($text, 'you tube') || str_contains($text, 'يوتيوب')) {
-            return 'youtube';
-        }
-
-        if (str_contains($text, 'google') || str_contains($text, 'جوجل') || str_contains($text, 'غوغل')) {
-            return 'google';
-        }
-
-        if (str_contains($text, 'facebook') || str_contains($text, 'فيسبوك')) {
-            return 'facebook';
-        }
-
-        if (str_contains($text, 'gmail') || str_contains($text, 'جيميل')) {
-            return 'gmail';
-        }
-
-        return null;
-    }
-
-    private function detectWebsiteFromBrowserContext(mixed $browserContext): ?string
-    {
-        if (!is_array($browserContext)) {
-            return null;
-        }
-
-        $website = strtolower((string) ($browserContext['website'] ?? ''));
-
-        if ($website === '' && isset($browserContext['memory']) && is_array($browserContext['memory'])) {
-            $website = strtolower((string) ($browserContext['memory']['activeWebsite'] ?? ''));
-        }
-
-        if (str_contains($website, 'youtube') || $website === 'youtube') {
-            return 'youtube';
-        }
-
-        if (str_contains($website, 'google') || $website === 'google') {
-            return 'google';
-        }
-
-        if (str_contains($website, 'facebook') || $website === 'facebook') {
-            return 'facebook';
-        }
-
-        if (str_contains($website, 'gmail') || str_contains($website, 'mail.google') || $website === 'gmail') {
-            return 'gmail';
-        }
-
-        return null;
-    }
-
-    private function detectLocalBrowserAction(string $text): ?string
-    {
-        if (str_contains($text, 'scroll down') || str_contains($text, 'go down') || str_contains($text, 'show me more') || str_contains($text, 'move down') || str_contains($text, 'descends') || str_contains($text, 'descendre') || str_contains($text, 'انزل')) {
-            return 'SCROLL_DOWN';
-        }
-
-        if (str_contains($text, 'scroll up') || str_contains($text, 'go up') || str_contains($text, 'move up') || str_contains($text, 'monte') || str_contains($text, 'monter') || str_contains($text, 'اطلع')) {
-            return 'SCROLL_UP';
-        }
-
-        if (str_contains($text, 'pause') || str_contains($text, 'pause video') || str_contains($text, 'stop video') || str_contains($text, 'stop this') || str_contains($text, 'hold on') || str_contains($text, 'wait a second') || str_contains($text, 'mets pause') || str_contains($text, 'met pause') || str_contains($text, 'وقف الفيديو') || str_contains($text, 'حبس الفيديو')) {
-            return 'PAUSE_VIDEO';
-        }
-
-        if (str_contains($text, 'play') || str_contains($text, 'resume') || str_contains($text, 'continue') || str_contains($text, 'start video') || str_contains($text, 'joue la video') || str_contains($text, 'joue la vidéo') || str_contains($text, 'lance la video') || str_contains($text, 'lance la vidéo') || str_contains($text, 'شغل الفيديو') || str_contains($text, 'كمل الفيديو')) {
-            return 'PLAY_VIDEO';
-        }
-
-        if (str_contains($text, 'stop muting') || str_contains($text, 'stop the mute') || str_contains($text, 'unmute') || str_contains($text, 'sound on') || str_contains($text, 'turn sound on') || str_contains($text, 'enable sound') || str_contains($text, 'remets le son') || str_contains($text, 'remet le son') || str_contains($text, 'active le son') || str_contains($text, 'activer le son') || str_contains($text, 'شغل الصوت') || str_contains($text, 'رجع الصوت')) {
-            return 'UNMUTE';
-        }
-
-        if (str_contains($text, 'mute') || str_contains($text, 'sound off') || str_contains($text, 'turn sound off') || str_contains($text, 'disable sound') || str_contains($text, 'coupe le son') || str_contains($text, 'couper le son') || str_contains($text, 'désactive le son') || str_contains($text, 'desactive le son') || str_contains($text, 'كتم الصوت') || str_contains($text, 'اطفي الصوت')) {
-            return 'MUTE';
-        }
-
-        if (str_contains($text, 'go back') || str_contains($text, 'previous page') || str_contains($text, 'back page') || str_contains($text, 'retour') || str_contains($text, 'رجوع') || str_contains($text, 'ارجع')) {
-            return 'GO_BACK';
-        }
-
-        if (str_contains($text, 'read page') || str_contains($text, 'read this page') || str_contains($text, 'lis cette page') || str_contains($text, 'lire cette page') || str_contains($text, 'اقرأ')) {
-            return 'READ_PAGE';
-        }
-
-        if (str_contains($text, 'summarize page') || str_contains($text, 'summarize this page') || str_contains($text, 'resume page') || str_contains($text, 'résume cette page') || str_contains($text, 'لخص')) {
-            return 'SUMMARIZE_PAGE';
-        }
-
-        if (str_contains($text, 'return to assistant') || str_contains($text, 'back to assistant') || str_contains($text, 'voice assistant') || str_contains($text, 'where i talk to you') || str_contains($text, 'رجعني للمساعد')) {
-            return 'SWITCH_TO_ASSISTANT';
-        }
-
-        return null;
-    }
-
-    private function targetForLocalBrowserAction(string $action): ?string
-    {
-        return match ($action) {
-            'PLAY_VIDEO', 'PAUSE_VIDEO', 'MUTE', 'UNMUTE' => 'current video',
-            'SCROLL_DOWN', 'SCROLL_UP', 'READ_PAGE', 'SUMMARIZE_PAGE' => 'current page',
-            'GO_BACK' => 'browser history',
-            'SWITCH_TO_ASSISTANT' => 'voice assistant tab',
-            default => null,
-        };
-    }
-
-    private function localBrowserSpeech(string $action, string $language): string
-    {
-        if ($language === 'fr-FR') {
-            return match ($action) {
-                'SCROLL_DOWN' => 'Je fais défiler la page vers le bas.',
-                'SCROLL_UP' => 'Je fais défiler la page vers le haut.',
-                'PAUSE_VIDEO' => 'Je mets la vidéo en pause.',
-                'PLAY_VIDEO' => 'Je lance la vidéo.',
-                'MUTE' => 'Je coupe le son.',
-                'UNMUTE' => 'Je remets le son.',
-                'GO_BACK' => 'Je retourne à la page précédente.',
-                'READ_PAGE' => 'Je lis la page.',
-                'SUMMARIZE_PAGE' => 'Je résume la page.',
-                'SWITCH_TO_ASSISTANT' => 'Je retourne à l’assistant vocal.',
-                default => 'J’exécute l’action dans le navigateur.',
-            };
-        }
-
-        if ($language === 'ar-SA' || $language === 'ar-TN') {
-            return match ($action) {
-                'SCROLL_DOWN' => 'سأمرر الصفحة إلى الأسفل.',
-                'SCROLL_UP' => 'سأمرر الصفحة إلى الأعلى.',
-                'PAUSE_VIDEO' => 'سأوقف الفيديو مؤقتاً.',
-                'PLAY_VIDEO' => 'سأشغل الفيديو.',
-                'MUTE' => 'سأكتم الصوت.',
-                'UNMUTE' => 'سأعيد تشغيل الصوت.',
-                'GO_BACK' => 'سأرجع إلى الصفحة السابقة.',
-                'READ_PAGE' => 'سأقرأ الصفحة.',
-                'SUMMARIZE_PAGE' => 'سألخص الصفحة.',
-                'SWITCH_TO_ASSISTANT' => 'سأعود إلى المساعد الصوتي.',
-                default => 'سأنفذ الأمر في المتصفح.',
-            };
-        }
-
-        return match ($action) {
-            'SCROLL_DOWN' => 'Scrolling down.',
-            'SCROLL_UP' => 'Scrolling up.',
-            'PAUSE_VIDEO' => 'Pausing the video.',
-            'PLAY_VIDEO' => 'Playing the video.',
-            'MUTE' => 'Muting the video.',
-            'UNMUTE' => 'Turning the sound back on.',
-            'GO_BACK' => 'Going back.',
-            'READ_PAGE' => 'Reading the page.',
-            'SUMMARIZE_PAGE' => 'Summarizing the page.',
-            'SWITCH_TO_ASSISTANT' => 'Returning to the voice assistant.',
-            default => 'Executing browser action.',
-        };
-    }
-
-    private function looksLikeSearchCommand(string $text): bool
-    {
-        return (
-            str_contains($text, 'search') ||
-            str_contains($text, 'find') ||
-            str_contains($text, 'look for') ||
-            str_contains($text, 'chercher') ||
-            str_contains($text, 'cherche') ||
-            str_contains($text, 'recherche') ||
-            str_contains($text, 'trouve') ||
-            str_contains($text, 'ابحث') ||
-            str_contains($text, 'دور') ||
-            str_contains($text, 'فتش') ||
-            str_contains($text, 'song') ||
-            str_contains($text, 'songs') ||
-            str_contains($text, 'music') ||
-            str_contains($text, 'musique') ||
-            str_contains($text, 'chanson') ||
-            str_contains($text, 'chansons')
-        );
-    }
-
-    private function looksLikeOpenVideoByName(string $text): bool
-    {
-        return (
-            str_contains($text, 'open the video') ||
-            str_contains($text, 'open video') ||
-            str_contains($text, 'play the video') ||
-            str_contains($text, 'play video') ||
-            str_contains($text, 'video named') ||
-            str_contains($text, 'video called') ||
-            (str_contains($text, 'open') && str_contains($text, 'youtube')) ||
-            (str_contains($text, 'play') && str_contains($text, 'youtube')) ||
-            str_contains($text, 'ouvre la video') ||
-            str_contains($text, 'ouvre la vidéo') ||
-            str_contains($text, 'joue la video') ||
-            str_contains($text, 'joue la vidéo')
-        );
-    }
-
-    private function extractVideoTitleQuery(string $spokenText): string
-    {
-        $query = trim($spokenText);
-
-        $patterns = [
-            '/open\s+the\s+video\s+named\s+/i',
-            '/open\s+the\s+video\s+called\s+/i',
-            '/open\s+video\s+named\s+/i',
-            '/open\s+video\s+called\s+/i',
-            '/play\s+the\s+video\s+named\s+/i',
-            '/play\s+the\s+video\s+called\s+/i',
-            '/play\s+video\s+named\s+/i',
-            '/play\s+video\s+called\s+/i',
-            '/open\s+/i',
-            '/play\s+/i',
-            '/ouvre\s+la\s+vid[eé]o\s+/i',
-            '/joue\s+la\s+vid[eé]o\s+/i',
-            '/on\s+youtube/i',
-            '/in\s+youtube/i',
-            '/dans\s+youtube/i',
-            '/sur\s+youtube/i',
-            '/youtube/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            $query = preg_replace($pattern, '', $query);
-        }
-
-        return trim((string) $query);
-    }
-
-    private function extractLocalSearchQuery(string $spokenText): string
-    {
-        $query = trim($spokenText);
-
-        $patterns = [
-            '/search\s+youtube\s+for\s+/i',
-            '/search\s+google\s+for\s+/i',
-            '/search\s+facebook\s+for\s+/i',
-            '/search\s+for\s+/i',
-            '/search\s+/i',
-            '/find\s+/i',
-            '/look\s+for\s+/i',
-            '/chercher\s+/i',
-            '/cherche\s+/i',
-            '/recherche\s+/i',
-            '/trouve\s+/i',
-            '/songs?\s+/i',
-            '/music\s+/i',
-            '/musique\s+/i',
-            '/chansons?\s+/i',
-            '/on\s+youtube/i',
-            '/in\s+youtube/i',
-            '/dans\s+youtube/i',
-            '/sur\s+youtube/i',
-            '/on\s+google/i',
-            '/sur\s+google/i',
-            '/on\s+facebook/i',
-            '/sur\s+facebook/i',
-            '/youtube/i',
-            '/google/i',
-            '/facebook/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            $query = preg_replace($pattern, '', $query);
-        }
-
-        return trim((string) $query);
-    }
-
-    private function localSpeech(string $englishSpeech, string $language, array $context = []): string
-    {
-        $website = $context['website'] ?? null;
-        $query = $context['query'] ?? null;
-        $type = $context['type'] ?? null;
-
-        if ($language === 'fr-FR') {
-            if ($type === 'open_video_by_name' && $query !== null) {
-                return sprintf('Je cherche %s sur YouTube, puis j’ouvre la vidéo correspondante.', $query);
-            }
-
-            if ($type === 'search' && $website !== null && $query !== null) {
-                return sprintf('Je cherche %s sur %s.', $query, ucfirst($website));
-            }
-
-            if ($type === 'open' && $website !== null) {
-                return sprintf('J’ouvre %s.', ucfirst($website));
-            }
-        }
-
-        if ($language === 'ar-SA' || $language === 'ar-TN') {
-            if ($type === 'open_video_by_name' && $query !== null) {
-                return sprintf('سأبحث عن %s في YouTube ثم أفتح الفيديو المطابق.', $query);
-            }
-
-            if ($type === 'search' && $website !== null && $query !== null) {
-                return sprintf('سأبحث عن %s في %s.', $query, ucfirst($website));
-            }
-
-            if ($type === 'open' && $website !== null) {
-                return sprintf('سأفتح %s.', ucfirst($website));
-            }
-        }
-
-        return $englishSpeech;
-    }
-
-    private function buildExternalWebsiteUrl(string $website, string $action, ?string $query): ?string
-    {
-        $website = strtolower($website);
-        $action = strtolower($action);
-        $query = trim((string) $query);
-
-        if ($action === 'search' && $query !== '') {
-            return match ($website) {
-                'youtube' => 'https://www.youtube.com/results?search_query=' . rawurlencode($query),
-                'google' => 'https://www.google.com/search?q=' . rawurlencode($query),
-                'facebook' => 'https://www.facebook.com/search/top?q=' . rawurlencode($query),
-                default => null,
-            };
-        }
-
-        return match ($website) {
-            'youtube' => 'https://www.youtube.com',
-            'google' => 'https://www.google.com',
-            'facebook' => 'https://www.facebook.com',
-            'gmail' => 'https://mail.google.com',
-            default => null,
-        };
-    }
-
-    private function normalizeResultPosition(mixed $value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $position = (int) $value;
-
-        if ($position < 1 || $position > 10) {
-            return null;
-        }
-
-        return $position;
-    }
-
-    private function normalizeBrowserAction(?string $action): ?string
-    {
-        if ($action === null || trim($action) === '') {
-            return null;
-        }
-
-        return strtoupper(trim($action));
-    }
-
-    private function normalizeWebsiteActionForExtension(?string $action): ?string
-    {
-        if ($action === null || trim($action) === '') {
-            return null;
-        }
-
-        $normalized = strtolower(trim($action));
-
-        return match ($normalized) {
-            'open', 'open_url', 'open-url' => 'OPEN_URL',
-            'search', 'search_url', 'search-url' => 'SEARCH',
-            default => strtoupper($normalized),
-        };
-    }
-
-    private function normalizeNextAction(mixed $nextAction): ?array
-    {
-        if (!is_array($nextAction)) {
-            return null;
-        }
-
-        $action = $this->normalizeBrowserAction($nextAction['action'] ?? null);
-
-        if ($action === null) {
-            return null;
-        }
-
-        return [
-            'intent' => $nextAction['intent'] ?? 'BROWSER_ACTION',
+            'success' => true,
+            'intent' => 'BROWSER_ACTION',
+            'mode' => $mode,
+            'requiresExtension' => true,
             'action' => $action,
-            'target' => $nextAction['target'] ?? null,
-            'resultPosition' => $this->normalizeResultPosition($nextAction['resultPosition'] ?? null),
+            'query' => $query,
+            'target' => $target,
+            'resultPosition' => $resultPosition,
+            'message' => $speech,
+            'speech' => $speech,
+            'confidence' => $confidence,
+            'reason' => $reason,
+            'extensionCommand' => [
+                'action' => $action,
+                'query' => $query,
+                'target' => $target,
+                'resultPosition' => $resultPosition,
+                'language' => $language,
+                'context' => $browserContext,
+            ],
         ];
+    }
+
+    private function buildWebsiteOpenSpeech(string $website): string
+    {
+        return 'Sure, I will open ' . ucfirst($website) . ' now.';
+    }
+
+    private function buildWebsiteSearchSpeech(string $website, string $query): string
+    {
+        return 'Sure, I will search ' . ucfirst($website) . ' for ' . $query . ' now.';
+    }
+
+    private function normalizeWebsiteAction(string $action): string
+    {
+        $action = strtoupper(trim($action));
+
+        return match ($action) {
+            'OPEN', 'OPEN_URL', 'OPEN-URL', 'OPEN_SITE', 'OPEN_WEBSITE' => 'OPEN_URL',
+            'SEARCH', 'SEARCH_URL', 'SEARCH-URL', 'SEARCH_WEB' => 'SEARCH',
+            default => $action,
+        };
+    }
+
+    private function normalizeBrowserAction(string $action): string
+    {
+        $action = strtoupper(trim($action));
+
+        return match ($action) {
+            'OPEN_RESULT', 'SELECT', 'CLICK_RESULT' => 'SELECT_RESULT',
+            'BACK' => 'GO_BACK',
+            'FORWARD' => 'GO_FORWARD',
+            'PLAY' => 'PLAY_VIDEO',
+            'PAUSE' => 'PAUSE_VIDEO',
+            'READ' => 'READ_PAGE',
+            'SUMMARIZE' => 'SUMMARIZE_PAGE',
+            'RETURN_ASSISTANT', 'FOCUS_ASSISTANT' => 'RETURN_TO_ASSISTANT',
+            default => $action,
+        };
+    }
+
+    private function speechForBrowserAction(string $action): string
+    {
+        return match ($action) {
+            'SCROLL_DOWN' => 'Sure, I will scroll down now.',
+            'SCROLL_UP' => 'Sure, I will scroll up now.',
+            'GO_BACK' => 'Sure, I will go back now.',
+            'GO_FORWARD' => 'Sure, I will go forward now.',
+            'PLAY_VIDEO' => 'Sure, I will play the video now.',
+            'PAUSE_VIDEO' => 'Sure, I will pause the video now.',
+            'MUTE' => 'Sure, I will mute the video now.',
+            'UNMUTE' => 'Sure, I will unmute the video now.',
+            'VOLUME_UP' => 'Sure, I will increase the volume now.',
+            'VOLUME_DOWN' => 'Sure, I will decrease the volume now.',
+            'READ_PAGE' => 'Sure, I will read this page now.',
+            'SUMMARIZE_PAGE' => 'Sure, I will summarize this page now.',
+            'RETURN_TO_ASSISTANT' => 'Sure, I will return to the assistant now.',
+            default => 'Sure, I will process that now.',
+        };
+    }
+
+    private function normalizeText(string $text): string
+    {
+        $text = trim($text);
+        $text = function_exists('mb_strtolower') ? mb_strtolower($text) : strtolower($text);
+        $text = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+
+        return trim($text);
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value) || is_object($value) || is_bool($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' || strtolower($value) === 'null' ? null : $value;
+    }
+
+    private function buildSafeChatPrompt(string $spokenText): string
+    {
+        return <<<PROMPT
+User message:
+{$spokenText}
+
+You are the chatbot for this exact accessibility-focused voice assistant web app.
+
+Important:
+- Answer normal questions naturally and helpfully.
+- Do not claim that you personally executed actions.
+- Do not say external website control is impossible when the app supports it.
+- If the user asks about a supported action, explain briefly that the secure executor handles actions.
+- Do not invent pages that may not exist.
+- Do not tell the user to open Settings, Security, Account Management, or Delete Account unless the app explicitly provided that as a local command.
+- You cannot delete accounts, change passwords, send email, open websites, or control the browser by yourself.
+- If the user asks for an action that is not connected, say that it is not connected yet.
+- Keep answers short, clear, friendly, and accessible.
+PROMPT;
+    }
+
+    private function buildFirstAvailableLocalAppUrl(array $routeNames, string $fallbackPath, string $baseUrl): string
+    {
+        foreach ($routeNames as $routeName) {
+            try {
+                return $baseUrl . $this->generateUrl($routeName);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return $baseUrl . $fallbackPath;
+    }
+
+    private function tryGenerateFirstAvailableLocalAppUrl(array $routeNames, string $baseUrl): ?string
+    {
+        foreach ($routeNames as $routeName) {
+            try {
+                return $baseUrl . $this->generateUrl($routeName);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
     }
 }

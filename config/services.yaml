@@ -1,5 +1,5 @@
 parameters:
-    huggingface_chat_model: 'meta-llama/Llama-3.1-8B-Instruct:cerebras'
+    gemini_model: 'gemini-2.5-flash'
 
 services:
     _defaults:
@@ -13,15 +13,23 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    
-    App\Service\LlmCommandInterpreterService:
+    App\Service\GeminiChatService:
         arguments:
-            $huggingFaceToken: '%env(HUGGINGFACE_API_TOKEN)%'
-            $huggingFaceModel: '%env(default:huggingface_chat_model:HUGGINGFACE_CHAT_MODEL)%'
+            $geminiApiKey: '%env(GEMINI_API_KEY)%'
 
-    App\Service\InternalVoiceCommandInterpreterService:
+    App\Service\GeminiCommandInterpreterService:
         arguments:
-            $huggingFaceToken: '%env(HUGGINGFACE_API_TOKEN)%'
-            $huggingFaceModel: '%env(default:huggingface_chat_model:HUGGINGFACE_CHAT_MODEL)%'
+            $geminiApiKey: '%env(GEMINI_API_KEY)%'
+            $geminiModel: '%env(default:gemini_model:GEMINI_MODEL)%'
 
-   
+    App\Service\GmailService:
+        arguments:
+            $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
+            $googleRedirectUri: '%env(GOOGLE_REDIRECT_URI)%'
+
+    App\Controller\GoogleOAuthController:
+        arguments:
+            $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
+            $googleRedirectUri: '%env(GOOGLE_REDIRECT_URI)%'

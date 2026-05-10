@@ -10,7 +10,10 @@ use Symfony\Component\HttpFoundation\RequestStack;
 class GmailService
 {
     public function __construct(
-        private RequestStack $requestStack
+        private readonly RequestStack $requestStack,
+        private readonly string $googleClientId,
+        private readonly string $googleClientSecret,
+        private readonly string $googleRedirectUri
     ) {
     }
 
@@ -21,12 +24,19 @@ class GmailService
 
     public function sendEmail(string $to, string $subject, string $body): array
     {
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'message' => 'The recipient email address is invalid.',
+            ];
+        }
+
         $token = $this->getToken();
 
         if (!is_array($token)) {
             return [
                 'success' => false,
-                'message' => 'Gmail is not connected. Please open /google/oauth/connect first.',
+                'message' => 'Gmail is not connected. Please connect Gmail first.',
                 'connectUrl' => '/google/oauth/connect',
             ];
         }
@@ -102,10 +112,11 @@ class GmailService
     private function createGoogleClient(): GoogleClient
     {
         $client = new GoogleClient();
-        $client->setClientId($_ENV['GOOGLE_CLIENT_ID'] ?? '');
-        $client->setClientSecret($_ENV['GOOGLE_CLIENT_SECRET'] ?? '');
-        $client->setRedirectUri($_ENV['GOOGLE_REDIRECT_URI'] ?? 'http://127.0.0.1:8000/google/oauth/callback');
+        $client->setClientId($this->googleClientId);
+        $client->setClientSecret($this->googleClientSecret);
+        $client->setRedirectUri($this->googleRedirectUri);
         $client->setAccessType('offline');
+        $client->setPrompt('consent');
         $client->addScope('https://www.googleapis.com/auth/gmail.send');
 
         return $client;
