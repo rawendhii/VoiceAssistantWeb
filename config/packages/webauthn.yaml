@@ -1,0 +1,27 @@
+webauthn:
+    credential_repository: 'App\Repository\WebauthnCredentialRepository'
+    user_repository: 'App\Repository\WebauthnUserEntityRepository'
+
+    creation_profiles:
+        default:
+            rp:
+                name: '%env(RELYING_PARTY_NAME)%'
+                id: '%env(RELYING_PARTY_ID)%'
+            authenticator_selection_criteria:
+                require_resident_key: true
+                resident_key: required
+                user_verification: required
+
+    request_profiles:
+        default:
+            rp_id: '%env(RELYING_PARTY_ID)%'
+            user_verification: required
+
+    controllers:
+        enabled: true
+        creation:
+            from_user_account:
+                options_path: '/front/profile/passkey/options'
+                result_path: '/front/profile/passkey/register'
+                user_entity_guesser: App\Security\PasskeyCurrentUserEntityGuesser
+                hide_existing_credentials: false

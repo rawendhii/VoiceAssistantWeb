@@ -1,0 +1,735 @@
+{% extends 'front/layout.html.twig' %}
+
+{% block front_content %}
+   <main
+    class="camera-login-page"
+    data-save-url="{{ path('front_camera_login_save') }}"
+    data-profile-url="{{ path('front_profile') }}?cameraLogin=enabled"
+    data-csrf-token="{{ csrf_token('camera_face_save') }}"
+>
+        <section class="camera-card">
+            <div class="camera-header">
+                <div>
+                    <span class="camera-kicker">Accessible Camera Login</span>
+                    <h1>Enable Camera Login</h1>
+                    <p>
+                        Press <strong>Space</strong> or click Start. The app will ask you to look at the camera,
+                        close your eyes, and open your eyes. No normal photo is saved; only a numeric face template is stored.
+                    </p>
+                </div>
+
+                <a href="{{ path('front_profile') }}" class="back-link">
+                    Back to profile
+                </a>
+            </div>
+
+            <div class="camera-stage">
+                <video id="cameraVideo" autoplay playsinline muted></video>
+                <canvas id="cameraCanvas"></canvas>
+            </div>
+
+            <div id="cameraStatus" class="camera-status">
+                Press Space to start camera login setup.
+            </div>
+
+            <div class="step-grid">
+                <div id="stepFace" class="step-pill">1. Look at camera</div>
+                <div id="stepClose" class="step-pill">2. Close eyes</div>
+                <div id="stepOpen" class="step-pill">3. Open eyes</div>
+                <div id="stepDone" class="step-pill">4. Saved</div>
+            </div>
+
+            <button id="startCameraTestButton" type="button" class="camera-btn">
+                Start Camera Login Setup
+            </button>
+        </section>
+    </main>
+
+    <style>
+        .camera-login-page,
+        .camera-login-page * {
+            box-sizing: border-box;
+        }
+
+        .camera-login-page {
+            max-width: 1040px;
+            margin: 0 auto;
+            color: #0f172a;
+        }
+
+        .camera-card {
+            display: grid;
+            gap: 20px;
+            padding: 26px;
+            border-radius: 28px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.10);
+        }
+
+        .camera-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .camera-kicker {
+            display: inline-flex;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            font-size: 12px;
+            font-weight: 950;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .camera-header h1 {
+            margin: 12px 0 8px;
+            font-size: clamp(34px, 4vw, 54px);
+            line-height: 1;
+            font-weight: 950;
+            letter-spacing: -0.06em;
+        }
+
+        .camera-header p {
+            max-width: 760px;
+            margin: 0;
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.55;
+            font-weight: 650;
+        }
+
+        .back-link {
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            border-radius: 14px;
+            background: #f8fafc;
+            color: #1d4ed8;
+            border: 1px solid #dbeafe;
+            text-decoration: none;
+            font-weight: 900;
+        }
+
+        .camera-stage {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            min-height: 320px;
+            border-radius: 24px;
+            background: #020617;
+            border: 1px solid #1e293b;
+        }
+
+        #cameraVideo,
+        #cameraCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #cameraVideo {
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #cameraCanvas {
+            pointer-events: none;
+            transform: scaleX(-1);
+        }
+
+        .camera-status {
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            border-radius: 18px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            font-size: 16px;
+            line-height: 1.45;
+            font-weight: 850;
+        }
+
+        .camera-status.error {
+            color: #991b1b;
+            background: #fee2e2;
+            border-color: #fecaca;
+        }
+
+        .camera-status.success {
+            color: #166534;
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .step-pill {
+            min-height: 48px;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            padding: 8px;
+            border-radius: 14px;
+            background: #f8fafc;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .step-pill.active {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+
+        .step-pill.done {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
+        }
+
+        .camera-btn {
+            min-height: 58px;
+            width: 100%;
+            border: 0;
+            border-radius: 18px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #0f172a, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.26);
+            font-size: 16px;
+            font-weight: 950;
+            cursor: pointer;
+        }
+
+        .camera-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+            .step-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .camera-stage {
+                aspect-ratio: 4 / 3;
+                min-height: 280px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                transition-duration: 0.001ms !important;
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+    </style>
+
+    <script type="module">
+        import vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm';
+
+        const { FaceLandmarker, FilesetResolver } = vision;
+
+        const page = document.querySelector('.camera-login-page');
+       const saveUrl = page.dataset.saveUrl;
+const profileUrl = page.dataset.profileUrl;
+const csrfToken = page.dataset.csrfToken;
+        const video = document.getElementById('cameraVideo');
+        const canvas = document.getElementById('cameraCanvas');
+        const statusBox = document.getElementById('cameraStatus');
+        const startButton = document.getElementById('startCameraTestButton');
+
+        const stepElements = {
+            face: document.getElementById('stepFace'),
+            close: document.getElementById('stepClose'),
+            open: document.getElementById('stepOpen'),
+            done: document.getElementById('stepDone')
+        };
+
+        const selectedLandmarkIndexes = [
+            1, 4, 10, 33, 46, 52, 55, 61, 70, 78,
+            105, 107, 127, 130, 133, 145, 152, 159, 168, 172,
+            199, 234, 246, 249, 263, 276, 282, 285, 291, 300,
+            334, 336, 356, 359, 362, 374, 386, 397, 454, 466
+        ];
+
+        let faceLandmarker = null;
+        let cameraStream = null;
+        let running = false;
+        let currentStep = 'idle';
+        let closedEyesDetected = false;
+        let lastVideoTime = -1;
+        let lastSpokenMessage = '';
+        let latestGoodLandmarks = null;
+
+        function setStatus(message, type = null) {
+            statusBox.textContent = message;
+            statusBox.classList.remove('error', 'success');
+
+            if (type) {
+                statusBox.classList.add(type);
+            }
+
+            speak(message);
+        }
+        
+
+        function speak(message) {
+            if (!('speechSynthesis' in window)) {
+                return;
+            }
+
+            if (message === lastSpokenMessage) {
+                return;
+            }
+
+            lastSpokenMessage = message;
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = navigator.language || 'en-US';
+            utterance.rate = 0.92;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function markStep(step, state) {
+            const element = stepElements[step];
+
+            if (!element) {
+                return;
+            }
+
+            element.classList.remove('active', 'done');
+
+            if (state) {
+                element.classList.add(state);
+            }
+        }
+
+        function setStep(step) {
+            currentStep = step;
+
+            Object.keys(stepElements).forEach(function (key) {
+                if (!stepElements[key].classList.contains('done')) {
+                    markStep(key, null);
+                }
+            });
+
+            if (stepElements[step]) {
+                markStep(step, 'active');
+            }
+        }
+
+        function completeStep(step) {
+            markStep(step, 'done');
+        }
+
+        async function createFaceLandmarker() {
+            if (faceLandmarker) {
+                return faceLandmarker;
+            }
+
+            setStatus('Loading face detection model. Please wait.');
+
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm'
+            );
+
+            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                    delegate: 'CPU'
+                },
+                runningMode: 'VIDEO',
+                numFaces: 1,
+                outputFaceBlendshapes: true
+            });
+
+            return faceLandmarker;
+        }
+
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera access is not supported in this browser.');
+            }
+
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(function (track) {
+                    track.stop();
+                });
+
+                cameraStream = null;
+            }
+
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 960 },
+                    height: { ideal: 540 }
+                },
+                audio: false
+            });
+
+            video.srcObject = cameraStream;
+
+            await new Promise(function (resolve) {
+                video.onloadedmetadata = resolve;
+            });
+
+            await video.play();
+
+            canvas.width = video.videoWidth || 960;
+            canvas.height = video.videoHeight || 540;
+        }
+
+        function getBlendScore(results, categoryName) {
+            const blendshapes = results.faceBlendshapes;
+
+            if (!blendshapes || !blendshapes[0] || !Array.isArray(blendshapes[0].categories)) {
+                return 0;
+            }
+
+            const found = blendshapes[0].categories.find(function (category) {
+                return category.categoryName === categoryName;
+            });
+
+            return found ? found.score : 0;
+        }
+
+        function getFaceCenter(landmarks) {
+            if (!Array.isArray(landmarks) || landmarks.length === 0) {
+                return null;
+            }
+
+            let sumX = 0;
+            let sumY = 0;
+            let sumZ = 0;
+
+            landmarks.forEach(function (point) {
+                sumX += point.x;
+                sumY += point.y;
+                sumZ += point.z || 0;
+            });
+
+            return {
+                x: sumX / landmarks.length,
+                y: sumY / landmarks.length,
+                z: sumZ / landmarks.length
+            };
+        }
+
+        function getDistance(pointA, pointB) {
+            if (!pointA || !pointB) {
+                return 0;
+            }
+
+            const dx = pointA.x - pointB.x;
+            const dy = pointA.y - pointB.y;
+            const dz = (pointA.z || 0) - (pointB.z || 0);
+
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        function drawFacePoint(landmarks) {
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            const center = getFaceCenter(landmarks);
+
+            if (!center) {
+                return;
+            }
+
+            context.beginPath();
+            context.arc(center.x * canvas.width, center.y * canvas.height, 12, 0, Math.PI * 2);
+            context.fillStyle = '#22c55e';
+            context.fill();
+
+            context.lineWidth = 4;
+            context.strokeStyle = '#ffffff';
+            context.stroke();
+        }
+
+        function clearCanvas() {
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        function stopCamera() {
+    if (!cameraStream) {
+        return;
+    }
+
+    cameraStream.getTracks().forEach(function (track) {
+        track.stop();
+    });
+
+    cameraStream = null;
+}
+
+        function resetLivenessState() {
+            currentStep = 'idle';
+            closedEyesDetected = false;
+            lastVideoTime = -1;
+            lastSpokenMessage = '';
+            latestGoodLandmarks = null;
+
+            Object.keys(stepElements).forEach(function (key) {
+                markStep(key, null);
+            });
+
+            clearCanvas();
+        }
+
+        function roundNumber(value) {
+            return Math.round(value * 10000) / 10000;
+        }
+
+        function buildFaceTemplate(landmarks) {
+            const center = getFaceCenter(landmarks);
+
+            if (!center) {
+                throw new Error('Could not calculate face center.');
+            }
+
+            const eyeDistance = getDistance(landmarks[33], landmarks[263]);
+            const scale = Math.max(eyeDistance, 0.03);
+
+            const vector = [];
+
+            selectedLandmarkIndexes.forEach(function (index) {
+                const point = landmarks[index];
+
+                if (!point) {
+                    return;
+                }
+
+                vector.push(roundNumber((point.x - center.x) / scale));
+                vector.push(roundNumber((point.y - center.y) / scale));
+                vector.push(roundNumber(((point.z || 0) - center.z) / scale));
+            });
+
+            return {
+                version: 1,
+                model: 'mediapipe_face_landmarker_0.10.3',
+                method: 'normalized_selected_landmarks',
+                selectedLandmarkIndexes: selectedLandmarkIndexes,
+                vector: vector,
+                vectorLength: vector.length,
+                createdAt: new Date().toISOString()
+            };
+        }
+
+        async function saveFaceTemplate(landmarks) {
+            const templateData = buildFaceTemplate(landmarks);
+
+            setStatus('Liveness passed. Saving your camera login template.');
+
+            const response = await fetch(saveUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    _token: csrfToken,
+                    livenessPassed: true,
+                    templateData: templateData
+                })
+            });
+
+            const result = await response.json().catch(function () {
+                return null;
+            });
+
+            if (!response.ok || !result || !result.success) {
+                throw new Error(
+                    result && result.message
+                        ? result.message
+                        : 'Could not save camera login template.'
+                );
+            }
+
+            return result;
+        }
+
+        async function finishLiveness() {
+    try {
+        if (!latestGoodLandmarks) {
+            throw new Error('No valid face landmarks were captured.');
+        }
+
+        running = false;
+        completeStep('open');
+        completeStep('done');
+        setStep('done');
+
+        const result = await saveFaceTemplate(latestGoodLandmarks);
+
+        stopCamera();
+
+        startButton.disabled = false;
+        startButton.textContent = 'Return to Profile';
+
+        startButton.onclick = function () {
+            window.location.href = profileUrl;
+        };
+
+        setStatus(
+            result.message + ' Returning to your profile in 3 seconds.',
+            'success'
+        );
+
+        window.setTimeout(function () {
+            window.location.href = profileUrl;
+        }, 3000);
+    } catch (error) {
+        console.error('CAMERA LOGIN SAVE ERROR:', error);
+
+        running = false;
+        startButton.disabled = false;
+        startButton.textContent = 'Try Again';
+
+        setStatus(
+            error.message || 'Camera login setup failed. Please try again.',
+            'error'
+        );
+    }
+}
+
+        function handleLiveness(results) {
+            if (!results.faceLandmarks || !results.faceLandmarks[0]) {
+                setStep('face');
+                setStatus('No face detected. Please look at the camera.');
+                clearCanvas();
+                return;
+            }
+
+            const landmarks = results.faceLandmarks[0];
+            latestGoodLandmarks = landmarks;
+
+            const leftBlink = getBlendScore(results, 'eyeBlinkLeft');
+            const rightBlink = getBlendScore(results, 'eyeBlinkRight');
+
+            const bothEyesClosed = leftBlink > 0.30 && rightBlink > 0.30;
+            const bothEyesOpen = leftBlink < 0.30 && rightBlink < 0.30;
+
+            drawFacePoint(landmarks);
+
+            if (currentStep === 'idle' || currentStep === 'face') {
+                completeStep('face');
+                setStep('close');
+                setStatus('Face detected. Please close both eyes.');
+                return;
+            }
+
+            if (currentStep === 'close') {
+                if (bothEyesClosed) {
+                    closedEyesDetected = true;
+                    completeStep('close');
+                    setStep('open');
+                    setStatus('Good. Now open your eyes.');
+                }
+
+                return;
+            }
+
+            if (currentStep === 'open') {
+                if (closedEyesDetected && bothEyesOpen) {
+                    finishLiveness();
+                }
+            }
+        }
+
+        async function detectLoop() {
+            if (!running || !faceLandmarker) {
+                return;
+            }
+
+            if (video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+
+                const results = faceLandmarker.detectForVideo(video, performance.now());
+                handleLiveness(results);
+            }
+
+            window.requestAnimationFrame(detectLoop);
+        }
+
+        async function startTest() {
+            try {
+                startButton.disabled = true;
+                startButton.textContent = 'Camera setup running...';
+                resetLivenessState();
+
+                await createFaceLandmarker();
+                await startCamera();
+
+                running = true;
+                setStep('face');
+                setStatus('Camera opened. Please look at the camera.');
+
+                detectLoop();
+            } catch (error) {
+                console.error('CAMERA LOGIN SETUP ERROR:', error);
+
+                running = false;
+                startButton.disabled = false;
+                startButton.textContent = 'Start Camera Login Setup';
+
+                setStatus(
+                    error.message || 'Camera login setup failed. Please allow camera access and try again.',
+                    'error'
+                );
+            }
+        }
+
+        startButton.addEventListener('click', startTest);
+
+        document.addEventListener('keydown', function (event) {
+            const isPlainSpace =
+                event.code === 'Space' &&
+                !event.ctrlKey &&
+                !event.altKey &&
+                !event.shiftKey &&
+                !event.metaKey;
+
+            if (!isPlainSpace) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!running) {
+                startTest();
+            }
+        }, true);
+
+        setStatus('Press Space to start camera login setup.');
+    </script>
+{% endblock %}

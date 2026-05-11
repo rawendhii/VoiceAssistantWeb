@@ -46,8 +46,8 @@
                     <h2>Control your workspace with your voice.</h2>
 
                     <p>
-                        Sign in to access assisted browsing, voice commands, file navigation,
-                        and a more accessible digital workspace.
+                        Press Space and speak naturally. Use Camera Login, Passkey Login,
+                        or password login without needing a mouse.
                     </p>
                 </div>
 
@@ -61,13 +61,13 @@
                 <div class="auth-form-wrap">
                     <span class="auth-form-kicker">
                         <i data-lucide="lock-keyhole"></i>
-                        Secure Login
+                        Accessible Login
                     </span>
 
                     <h1>Sign in</h1>
 
                     <p class="auth-subtitle">
-                        Welcome back. Enter your details to continue.
+                        Press <strong>Space</strong> to speak. Say “camera login”, “passkey login”, or “password login”.
                     </p>
 
                     {% if error %}
@@ -83,6 +83,11 @@
                             <span>{{ message }}</span>
                         </div>
                     {% endfor %}
+
+                    <div id="passkeyLoginStatus" class="auth-message auth-message-info" hidden>
+                        <i data-lucide="info"></i>
+                        <span></span>
+                    </div>
 
                     <form method="post" class="auth-form">
                         <div class="auth-form-group">
@@ -140,9 +145,36 @@
 
                         <button type="submit" class="auth-btn">
                             <i data-lucide="log-in"></i>
-                            Log in
+                            Log in with Password
                         </button>
                     </form>
+
+                    <div class="auth-divider">
+                        <span>or</span>
+                    </div>
+
+                    <a
+                        href="{{ path('camera_login') }}"
+                        id="cameraLoginButton"
+                        class="auth-btn auth-btn-camera"
+                    >
+                        <i data-lucide="camera"></i>
+                        Login with Camera
+                    </a>
+
+                    <button
+                        type="button"
+                        id="passkeyLoginButton"
+                        class="auth-btn auth-btn-passkey"
+                    >
+                        <i data-lucide="scan-face"></i>
+                        Login with Passkey / Windows Hello
+                    </button>
+
+                    <p class="auth-passkey-help">
+                        Camera Login uses your webcam and liveness steps. Passkey Login uses Windows Hello,
+                        Face ID, Touch ID, device PIN, or a security key when supported.
+                    </p>
                 </div>
             </section>
         </section>
@@ -175,7 +207,7 @@
         .auth-shell {
             position: relative;
             width: min(1040px, 100%);
-            height: min(620px, calc(100vh - 24px));
+            height: min(700px, calc(100vh - 24px));
             min-height: 0;
             display: grid;
             grid-template-columns: minmax(330px, 0.95fr) minmax(390px, 1.05fr);
@@ -460,7 +492,7 @@
             position: relative;
             display: grid;
             place-items: center;
-            padding: 26px 34px;
+            padding: 22px 34px;
             background:
                 radial-gradient(circle at 95% 0%, rgba(37, 99, 235, 0.08), transparent 30%),
                 #ffffff;
@@ -481,18 +513,28 @@
         .auth-form-wrap h1 {
             margin: 0;
             color: #0f172a;
-            font-size: clamp(36px, 4vw, 48px);
+            font-size: clamp(34px, 4vw, 46px);
             line-height: 1;
             letter-spacing: -0.065em;
             font-weight: 950;
         }
 
-        .auth-subtitle {
-            margin: 10px 0 18px;
+        .auth-subtitle,
+        .auth-passkey-help {
             color: #64748b;
             font-size: 15px;
             line-height: 1.4;
             font-weight: 650;
+        }
+
+        .auth-subtitle {
+            margin: 10px 0 16px;
+        }
+
+        .auth-passkey-help {
+            margin: 10px 0 0;
+            text-align: center;
+            font-size: 13px;
         }
 
         .auth-message {
@@ -523,6 +565,12 @@
             color: #166534;
             background: #dcfce7;
             border: 1px solid #86efac;
+        }
+
+        .auth-message-info {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
         }
 
         .auth-form {
@@ -629,7 +677,7 @@
         }
 
         .auth-btn {
-            min-height: 48px;
+            min-height: 50px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -645,6 +693,7 @@
             font-weight: 950;
             cursor: pointer;
             transition: 180ms ease;
+            text-decoration: none;
         }
 
         .auth-btn:hover {
@@ -655,6 +704,48 @@
         .auth-btn svg {
             width: 18px;
             height: 18px;
+        }
+
+        .auth-btn-camera {
+            min-height: 56px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #064e3b, #059669);
+            box-shadow: 0 14px 30px rgba(5, 150, 105, 0.26);
+        }
+
+        .auth-btn-passkey {
+            min-height: 56px;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+        }
+
+        .auth-divider {
+            position: relative;
+            display: grid;
+            place-items: center;
+            margin: 14px 0;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .auth-divider::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 1px;
+            background: #e2e8f0;
+        }
+
+        .auth-divider span {
+            position: relative;
+            z-index: 1;
+            padding: 0 10px;
+            background: #ffffff;
         }
 
         @keyframes authAurora {
@@ -730,13 +821,15 @@
             }
         }
 
-        @media (max-height: 720px) {
+        @media (max-height: 790px) {
             .auth-page {
                 padding: 8px;
+                overflow: auto;
             }
 
             .auth-shell {
-                height: calc(100vh - 16px);
+                height: auto;
+                min-height: calc(100vh - 16px);
             }
 
             .auth-brand-panel,
@@ -834,6 +927,757 @@
             if (window.lucide) {
                 lucide.createIcons();
             }
+
+            const passkeyLoginButton = document.getElementById('passkeyLoginButton');
+            const cameraLoginButton = document.getElementById('cameraLoginButton');
+            const passkeyLoginStatus = document.getElementById('passkeyLoginStatus');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const loginForm = document.querySelector('form.auth-form');
+            const submitButton = loginForm ? loginForm.querySelector('button[type="submit"]') : null;
+            const rememberCheckbox = document.querySelector('input[name="_remember_me"]');
+            const createAccountLink = document.querySelector('.auth-register-link');
+            const forgotPasswordLink = document.querySelector('.forgot-link');
+            const initialLoginGuide =
+    'Welcome to Assistant Vocal. First type or say your email address. ' +
+    'Then say camera login to open your account with your camera face, ' +
+    'or say password login to use your password. Press Space anytime to speak.';
+
+let welcomeWasSpoken = false;
+
+function speakWelcomeOnce() {
+    if (welcomeWasSpoken) {
+        return;
+    }
+
+    welcomeWasSpoken = true;
+    speakLogin(initialLoginGuide);
+}
+
+            let loginRecognition = null;
+            let loginIsListening = false;
+            let activeVoiceField = null;
+
+            function setPasskeyStatus(message, isError) {
+                if (!passkeyLoginStatus) {
+                    return;
+                }
+
+                const span = passkeyLoginStatus.querySelector('span');
+
+                if (span) {
+                    span.textContent = message;
+                }
+
+                passkeyLoginStatus.hidden = false;
+                passkeyLoginStatus.classList.toggle('auth-message-error', !!isError);
+                passkeyLoginStatus.classList.toggle('auth-message-info', !isError);
+            }
+
+            function speakLogin(text) {
+                if (!('speechSynthesis' in window)) {
+                    return;
+                }
+
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = navigator.language || 'en-US';
+                utterance.rate = 0.95;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+
+                window.speechSynthesis.speak(utterance);
+            }
+
+            function normalizeVoiceText(text) {
+                return String(text || '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^\p{L}\p{N}@._\-\s]/gu, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            function base64UrlToArrayBuffer(base64Url) {
+                const stringValue = String(base64Url || '');
+                const padding = '='.repeat((4 - stringValue.length % 4) % 4);
+                const base64 = (stringValue + padding)
+                    .replace(/-/g, '+')
+                    .replace(/_/g, '/');
+
+                const raw = window.atob(base64);
+                const buffer = new ArrayBuffer(raw.length);
+                const view = new Uint8Array(buffer);
+
+                for (let i = 0; i < raw.length; i++) {
+                    view[i] = raw.charCodeAt(i);
+                }
+
+                return buffer;
+            }
+
+            function arrayBufferToBase64Url(buffer) {
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+
+                bytes.forEach(function (byte) {
+                    binary += String.fromCharCode(byte);
+                });
+
+                return window.btoa(binary)
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/g, '');
+            }
+
+            function extractRequestOptions(rawOptions) {
+                return (
+                    rawOptions.publicKey ||
+                    rawOptions.publicKeyCredentialRequestOptions ||
+                    rawOptions.data?.publicKey ||
+                    rawOptions.data?.publicKeyCredentialRequestOptions ||
+                    rawOptions.data ||
+                    rawOptions
+                );
+            }
+
+            function preparePublicKeyRequestOptions(options) {
+                const preparedOptions = { ...options };
+
+                preparedOptions.challenge = base64UrlToArrayBuffer(preparedOptions.challenge);
+
+                if (Array.isArray(preparedOptions.allowCredentials)) {
+                    preparedOptions.allowCredentials = preparedOptions.allowCredentials.map(function (credential) {
+                        return {
+                            ...credential,
+                            id: base64UrlToArrayBuffer(credential.id)
+                        };
+                    });
+                }
+
+                return preparedOptions;
+            }
+
+            function credentialToJSON(credential) {
+                return {
+                    id: credential.id,
+                    rawId: arrayBufferToBase64Url(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        authenticatorData: arrayBufferToBase64Url(credential.response.authenticatorData),
+                        clientDataJSON: arrayBufferToBase64Url(credential.response.clientDataJSON),
+                        signature: arrayBufferToBase64Url(credential.response.signature),
+                        userHandle: credential.response.userHandle
+                            ? arrayBufferToBase64Url(credential.response.userHandle)
+                            : null
+                    }
+                };
+            }
+
+            async function loginWithPasskey() {
+                if (!window.PublicKeyCredential || !navigator.credentials) {
+                    setPasskeyStatus(
+                        'Passkey login is not supported in this browser. Please use Chrome, Edge, or Safari.',
+                        true
+                    );
+                    speakLogin('Passkey login is not supported in this browser.');
+                    return;
+                }
+
+                if (passkeyLoginButton) {
+                    passkeyLoginButton.disabled = true;
+                }
+
+                setPasskeyStatus('Opening Passkey or Windows Hello verification...', false);
+                speakLogin('Opening passkey login now.');
+
+                try {
+                    const optionsResponse = await fetch('{{ path('webauthn.controller.security.main.request.options') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+
+                    if (!optionsResponse.ok) {
+                        const errorText = await optionsResponse.text();
+                        console.error('PASSKEY LOGIN OPTIONS SERVER RESPONSE:', errorText);
+
+                        throw new Error(
+                            'Could not start passkey login. Server said: ' +
+                            errorText.slice(0, 800)
+                        );
+                    }
+
+                    const rawOptions = await optionsResponse.json();
+                    console.log('PASSKEY LOGIN OPTIONS:', rawOptions);
+
+                    const publicKeyOptions = extractRequestOptions(rawOptions);
+
+                    if (!publicKeyOptions.challenge) {
+                        throw new Error('Passkey login options are missing challenge.');
+                    }
+
+                    const credential = await navigator.credentials.get({
+                        publicKey: preparePublicKeyRequestOptions(publicKeyOptions)
+                    });
+
+                    if (!credential) {
+                        throw new Error('No passkey was selected.');
+                    }
+
+                    const payload = credentialToJSON(credential);
+
+                    console.log('PASSKEY LOGIN PAYLOAD:', payload);
+
+                    const resultResponse = await fetch('{{ path('webauthn.controller.security.main.request.result') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!resultResponse.ok) {
+                        const errorText = await resultResponse.text();
+                        console.error('PASSKEY LOGIN SERVER RESPONSE:', errorText);
+
+                        throw new Error(
+                            'Passkey login failed. Server said: ' +
+                            errorText.slice(0, 800)
+                        );
+                    }
+
+                    setPasskeyStatus('Passkey login successful. Opening your workspace...', false);
+                    speakLogin('Login successful. Opening your workspace.');
+
+                    window.location.href = '{{ path('app_redirect_after_login') }}';
+                } catch (error) {
+                    console.error('PASSKEY LOGIN ERROR:', error);
+
+                    setPasskeyStatus(
+                        error.message || 'Passkey login failed. Please try again or use password login.',
+                        true
+                    );
+
+                    speakLogin('Passkey login failed. You can try again or use another login method.');
+
+                    if (passkeyLoginButton) {
+                        passkeyLoginButton.disabled = false;
+                    }
+                }
+            }
+
+           function openCameraLogin() {
+    if (!cameraLoginButton) {
+        setPasskeyStatus('Camera login link was not found.', true);
+        speakLogin('Camera login link was not found.');
+        return;
+    }
+
+    const email = emailInput.value.trim().toLowerCase();
+
+    if (!email) {
+        activeVoiceField = 'email';
+        emailInput.focus();
+
+        setPasskeyStatus(
+            'First enter your email address. Press Space and say: write your email address. Then say camera login.',
+            false
+        );
+
+        speakLogin(
+            'First enter your email address. Press Space and say, write your email address. Then say camera login.'
+        );
+
+        return;
+    }
+
+    setPasskeyStatus('Opening camera login for ' + email + '.', false);
+    speakLogin('Opening camera login for this email.');
+
+    const separator = cameraLoginButton.href.includes('?') ? '&' : '?';
+    window.location.href = cameraLoginButton.href + separator + 'email=' + encodeURIComponent(email);
+}
+
+            function focusEmailField() {
+                if (!emailInput) {
+                    speakLogin('Email field was not found.');
+                    return;
+                }
+
+                activeVoiceField = 'email';
+                emailInput.focus();
+                setPasskeyStatus('Email field selected. Press Space and say: write your email address.', false);
+                speakLogin('Email field selected. Press Space and say, write your email address.');
+            }
+
+            function focusPasswordField() {
+                if (!passwordInput) {
+                    speakLogin('Password field was not found.');
+                    return;
+                }
+
+                activeVoiceField = 'password';
+                passwordInput.focus();
+                setPasskeyStatus('Password field selected. Press Space and say: write your password.', false);
+                speakLogin('Password field selected. Press Space and say, write your password.');
+            }
+
+            function spokenEmailToEmail(text) {
+                let value = String(text || '')
+                    .toLowerCase()
+                    .replace(/\s+at\s+/g, '@')
+                    .replace(/\s+arobase\s+/g, '@')
+                    .replace(/\s+dot\s+/g, '.')
+                    .replace(/\s+point\s+/g, '.')
+                    .replace(/\s+underscore\s+/g, '_')
+                    .replace(/\s+dash\s+/g, '-')
+                    .replace(/\s+hyphen\s+/g, '-')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                const domainMap = {
+                    gmail: 'gmail.com',
+                    'gmail com': 'gmail.com',
+                    googlemail: 'gmail.com',
+                    hotmail: 'hotmail.com',
+                    'hotmail com': 'hotmail.com',
+                    outlook: 'outlook.com',
+                    'outlook com': 'outlook.com',
+                    yahoo: 'yahoo.com',
+                    'yahoo com': 'yahoo.com'
+                };
+
+                if (!value.includes('@')) {
+                    for (const spokenDomain in domainMap) {
+                        if (value.endsWith(' ' + spokenDomain)) {
+                            const localPart = value.slice(0, -spokenDomain.length).trim().replace(/\s+/g, '');
+                            return localPart + '@' + domainMap[spokenDomain];
+                        }
+
+                        if (value === spokenDomain) {
+                            return '';
+                        }
+                    }
+                }
+
+                return value.replace(/\s+/g, '');
+            }
+
+            function extractDictatedText(originalText) {
+                const patterns = [
+                    /^write\s+(.+)$/i,
+                    /^type\s+(.+)$/i,
+                    /^enter\s+(.+)$/i,
+                    /^put\s+(.+)$/i,
+                    /^my email is\s+(.+)$/i,
+                    /^email is\s+(.+)$/i,
+                    /^my password is\s+(.+)$/i,
+                    /^password is\s+(.+)$/i
+                ];
+
+                for (const pattern of patterns) {
+                    const match = String(originalText || '').match(pattern);
+
+                    if (match && match[1]) {
+                        return match[1].trim();
+                    }
+                }
+
+                return null;
+            }
+
+            function typeIntoActiveField(originalText) {
+                const dictatedText = extractDictatedText(originalText);
+
+                if (!dictatedText) {
+                    return false;
+                }
+
+                if (activeVoiceField === 'email' || document.activeElement === emailInput) {
+                    const email = spokenEmailToEmail(dictatedText);
+
+                    emailInput.value = email;
+                    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    setPasskeyStatus('Email written: ' + email + '. Say password field, or say submit login if your password is already filled.', false);
+                    speakLogin('Email written. Say password field, or say submit login if your password is already filled.');
+
+                    return true;
+                }
+
+                if (activeVoiceField === 'password' || document.activeElement === passwordInput) {
+                    passwordInput.value = dictatedText.replace(/\s+/g, '');
+                    passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    setPasskeyStatus('Password written. Say submit login to continue.', false);
+                    speakLogin('Password written. Say submit login to continue.');
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            function submitLoginForm() {
+                if (!loginForm || !submitButton) {
+                    speakLogin('Login form was not found.');
+                    return;
+                }
+
+                if (!emailInput.value.trim()) {
+                    focusEmailField();
+                    return;
+                }
+
+                if (!passwordInput.value.trim()) {
+                    focusPasswordField();
+                    return;
+                }
+
+                speakLogin('Submitting login form.');
+                submitButton.click();
+            }
+
+            function passwordLoginMode() {
+                activeVoiceField = 'email';
+                focusEmailField();
+                setPasskeyStatus('Password login selected. Say: write your email address.', false);
+            }
+
+            function toggleRememberMe() {
+                if (!rememberCheckbox) {
+                    speakLogin('Remember me checkbox was not found.');
+                    return;
+                }
+
+                rememberCheckbox.checked = !rememberCheckbox.checked;
+
+                if (rememberCheckbox.checked) {
+                    speakLogin('Remember me enabled.');
+                    setPasskeyStatus('Remember me enabled.', false);
+                } else {
+                    speakLogin('Remember me disabled.');
+                    setPasskeyStatus('Remember me disabled.', false);
+                }
+            }
+
+            function openCreateAccount() {
+                if (!createAccountLink) {
+                    speakLogin('Create account link was not found.');
+                    return;
+                }
+
+                speakLogin('Opening create account page.');
+                window.location.href = createAccountLink.href;
+            }
+
+            function openForgotPassword() {
+                if (!forgotPasswordLink) {
+                    speakLogin('Forgot password link was not found.');
+                    return;
+                }
+
+                speakLogin('Opening password reset page.');
+                window.location.href = forgotPasswordLink.href;
+            }
+
+            function readLoginHelp() {
+               const message =
+    'You are on the login page. Press Space to speak. ' +
+    'First say email field, then say write your email address. ' +
+    'For example, say write abbott gmail to write abbott at gmail dot com. ' +
+    'After your email is written, say camera login to use webcam face recognition. ' +
+    'Or say password login to use your password. ' +
+    'Say password field, then say write your password. ' +
+    'Say submit login to send the password form. ' +
+    'Say passkey login to use Windows Hello, device PIN, or security key. ' +
+    'Say create account to register. ' +
+    'Say forgot password to reset your password.';
+
+                setPasskeyStatus(message, false);
+                speakLogin(message);
+            }
+
+            function handleLoginVoiceCommand(text) {
+                const normalized = normalizeVoiceText(text);
+
+                console.log('LOGIN VOICE COMMAND:', normalized);
+
+                if (!normalized) {
+                    speakLogin('I did not hear a command. Press Space and try again.');
+                    return;
+                }
+
+                if (typeIntoActiveField(text)) {
+                    return;
+                }
+
+                if (
+                    normalized === 'help' ||
+                    normalized === 'what can i say' ||
+                    normalized === 'read page' ||
+                    normalized === 'read this page' ||
+                    normalized === 'instructions'
+                ) {
+                    readLoginHelp();
+                    return;
+                }
+
+                if (
+                    normalized === 'camera' ||
+                    normalized === 'camera login' ||
+                    normalized === 'login camera' ||
+                    normalized === 'webcam login' ||
+                    normalized === 'login with camera' ||
+                    normalized === 'face recognition' ||
+                    normalized === 'login with face recognition' ||
+                    normalized === 'use camera' ||
+                    normalized.includes('use webcam') ||
+                    normalized.includes('open camera login')
+                ) {
+                    openCameraLogin();
+                    return;
+                }
+
+                if (
+                    normalized === 'passkey' ||
+                    normalized === 'pin' ||
+                    normalized === 'passkey login' ||
+                    normalized === 'login passkey' ||
+                    normalized === 'login with passkey' ||
+                    normalized === 'login with pin' ||
+                    normalized === 'sign in with passkey' ||
+                    normalized === 'sign in with pin' ||
+                    normalized.includes('use passkey') ||
+                    normalized.includes('use pin') ||
+                    normalized.includes('windows hello') ||
+                    normalized.includes('security key')
+                ) {
+                    loginWithPasskey();
+                    return;
+                }
+
+                if (
+                    normalized === 'password login' ||
+                    normalized === 'login password' ||
+                    normalized === 'email login' ||
+                    normalized === 'login with password' ||
+                    normalized === 'sign in with password' ||
+                    normalized.includes('use password')
+                ) {
+                    passwordLoginMode();
+                    return;
+                }
+
+                if (
+                    normalized.includes('email field') ||
+                    normalized.includes('the email field') ||
+                    normalized.includes('select email') ||
+                    normalized.includes('focus email') ||
+                    normalized === 'email'
+                ) {
+                    focusEmailField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('password field') ||
+                    normalized.includes('the password field') ||
+                    normalized.includes('select password') ||
+                    normalized.includes('focus password') ||
+                    normalized === 'password'
+                ) {
+                    focusPasswordField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('remember me') ||
+                    normalized.includes('keep me logged in')
+                ) {
+                    toggleRememberMe();
+                    return;
+                }
+
+                if (
+                    normalized === 'login' ||
+                    normalized === 'log in' ||
+                    normalized === 'sign in' ||
+                    normalized.includes('submit login') ||
+                    normalized.includes('send login') ||
+                    normalized.includes('continue login')
+                ) {
+                    if (emailInput.value.trim() && passwordInput.value.trim()) {
+                        submitLoginForm();
+                    } else {
+                        setPasskeyStatus('Say camera login, passkey login, or password login.', false);
+                        speakLogin('Say camera login, passkey login, or password login.');
+                    }
+
+                    return;
+                }
+
+                if (
+                    normalized.includes('create account') ||
+                    normalized.includes('register') ||
+                    normalized.includes('sign up')
+                ) {
+                    openCreateAccount();
+                    return;
+                }
+
+                if (
+                    normalized.includes('forgot password') ||
+                    normalized.includes('reset password') ||
+                    normalized.includes('password reset')
+                ) {
+                    openForgotPassword();
+                    return;
+                }
+
+                setPasskeyStatus(
+                    'I heard: "' + text + '". Say help to hear login commands.',
+                    false
+                );
+
+                speakLogin('I heard ' + text + '. Say help to hear login commands.');
+            }
+
+            function startLoginVoiceListening() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                if (!SpeechRecognition) {
+                    setPasskeyStatus(
+                        'Voice recognition is not supported in this browser. Please use Chrome or Edge.',
+                        true
+                    );
+                    speakLogin('Voice recognition is not supported in this browser.');
+                    return;
+                }
+
+                if (loginIsListening) {
+                    return;
+                }
+
+                if (!loginRecognition) {
+                    loginRecognition = new SpeechRecognition();
+                    loginRecognition.lang = navigator.language || 'en-US';
+                    loginRecognition.interimResults = false;
+                    loginRecognition.continuous = false;
+
+                    loginRecognition.onstart = function () {
+                        loginIsListening = true;
+                        setPasskeyStatus('Listening now. Say camera login, passkey login, password login, email field, or help.', false);
+                    };
+
+                    loginRecognition.onend = function () {
+                        loginIsListening = false;
+                    };
+
+                    loginRecognition.onerror = function (event) {
+                        loginIsListening = false;
+
+                        let message = 'Voice recognition error. Please press Space and try again.';
+
+                        if (event && event.error === 'not-allowed') {
+                            message = 'Microphone permission is blocked. Please allow microphone access for this site.';
+                        }
+
+                        if (event && event.error === 'no-speech') {
+                            message = 'I did not hear anything. Press Space and try again.';
+                        }
+
+                        if (event && event.error === 'audio-capture') {
+                            message = 'No microphone was found. Please check your microphone.';
+                        }
+
+                        if (event && event.error === 'network') {
+                            message = 'Voice recognition needs an internet connection.';
+                        }
+
+                        setPasskeyStatus(message, true);
+                        speakLogin(message);
+                    };
+
+                    loginRecognition.onresult = function (event) {
+                        const text = event.results[0][0].transcript.trim();
+
+                        setPasskeyStatus('I heard: ' + text, false);
+                        handleLoginVoiceCommand(text);
+                    };
+                }
+
+                try {
+                    window.speechSynthesis?.cancel();
+                    loginRecognition.lang = navigator.language || 'en-US';
+                    loginRecognition.start();
+                } catch (error) {
+                    setPasskeyStatus('The microphone is already starting. Please wait a moment.', false);
+                }
+            }
+
+            function stopLoginVoiceListening() {
+                if (loginRecognition && loginIsListening) {
+                    loginRecognition.stop();
+                }
+            }
+
+            function toggleLoginVoiceListening() {
+                if (loginIsListening) {
+                    stopLoginVoiceListening();
+                } else {
+                    startLoginVoiceListening();
+                }
+            }
+
+            document.addEventListener('keydown', function (event) {
+                const isPlainSpace =
+                    event.code === 'Space' &&
+                    !event.ctrlKey &&
+                    !event.altKey &&
+                    !event.shiftKey &&
+                    !event.metaKey;
+
+                if (!isPlainSpace) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                toggleLoginVoiceListening();
+            }, true);
+
+            if (passkeyLoginButton) {
+                passkeyLoginButton.addEventListener('click', loginWithPasskey);
+            }
+
+           if (cameraLoginButton) {
+    cameraLoginButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        openCameraLogin();
+    });
+}
+
+           setPasskeyStatus(initialLoginGuide, false);
+
+window.setTimeout(function () {
+    speakWelcomeOnce();
+}, 800);
+
+document.addEventListener('click', speakWelcomeOnce, { once: true });
+document.addEventListener('touchstart', speakWelcomeOnce, { once: true });
         });
     </script>
 {% endblock %}

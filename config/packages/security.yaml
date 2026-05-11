@@ -19,6 +19,14 @@ security:
             user_checker: App\Security\UserChecker
             custom_authenticator: App\Security\LoginFormAuthenticator
 
+            webauthn:
+                secured_rp_ids:
+                    - 'localhost'
+                authentication:
+                    routes:
+                        options_path: '/passkey/login/options'
+                        result_path: '/passkey/login'
+
             logout:
                 path: app_logout
                 target: app_login
@@ -29,6 +37,10 @@ security:
                 path: /
 
     access_control:
+        - { path: ^/passkey/login, roles: PUBLIC_ACCESS }
+        - { path: ^/camera-login, roles: PUBLIC_ACCESS }
+        - { path: ^/front/profile/passkey, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/front/profile/camera-login, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/front, roles: ROLE_USER }
         - { path: ^/voice, roles: ROLE_USER }

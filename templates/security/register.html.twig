@@ -22,7 +22,8 @@
                     <h1>Sign up</h1>
 
                     <p class="auth-subtitle">
-                        Create your account and start using the accessible voice assistant workspace.
+                        Press <strong>Space</strong> to speak. Say “full name”, “email field”,
+                        “password field”, “repeat password”, “accept terms”, or “register”.
                     </p>
 
                     {% for message in app.flashes('error') %}
@@ -38,6 +39,11 @@
                             <span>{{ message }}</span>
                         </div>
                     {% endfor %}
+
+                    <div id="registerVoiceStatus" class="auth-message auth-message-info" hidden>
+                        <i data-lucide="info"></i>
+                        <span></span>
+                    </div>
 
                     <form method="post" class="auth-form">
                         <div class="auth-form-group">
@@ -117,7 +123,7 @@
                         </div>
 
                         <label class="auth-remember auth-terms">
-                            <input type="checkbox" name="terms" required>
+                            <input id="termsCheckbox" type="checkbox" name="terms" required>
                             <span>I agree all statements in <a href="#">Terms of service</a></span>
                         </label>
 
@@ -163,8 +169,8 @@
                     <h2>Designed for easier digital access.</h2>
 
                     <p>
-                        Use voice commands to navigate, search, manage files, and interact with your workspace
-                        with less physical effort.
+                        Create your account with voice assistance. After registration, you can enable
+                        Camera Login from your profile for easier future access.
                     </p>
                 </div>
 
@@ -556,6 +562,12 @@
             border: 1px solid #86efac;
         }
 
+        .auth-message-info {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
         .auth-form {
             display: grid;
             gap: 9px;
@@ -878,6 +890,477 @@
             if (window.lucide) {
                 lucide.createIcons();
             }
+
+            const fullNameInput = document.getElementById('fullName');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const passwordConfirmationInput = document.getElementById('password_confirmation');
+            const termsCheckbox = document.getElementById('termsCheckbox');
+            const registerForm = document.querySelector('form.auth-form');
+            const submitButton = registerForm ? registerForm.querySelector('button[type="submit"]') : null;
+            const loginLink = document.querySelector('.auth-register-link');
+            const voiceStatus = document.getElementById('registerVoiceStatus');
+
+            let registerRecognition = null;
+            let registerIsListening = false;
+            let activeVoiceField = null;
+
+            function setVoiceStatus(message, isError = false) {
+                if (!voiceStatus) {
+                    return;
+                }
+
+                const span = voiceStatus.querySelector('span');
+
+                if (span) {
+                    span.textContent = message;
+                }
+
+                voiceStatus.hidden = false;
+                voiceStatus.classList.toggle('auth-message-error', !!isError);
+                voiceStatus.classList.toggle('auth-message-info', !isError);
+            }
+
+            function speakRegister(text) {
+                if (!('speechSynthesis' in window)) {
+                    return;
+                }
+
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = navigator.language || 'en-US';
+                utterance.rate = 0.95;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+
+                window.speechSynthesis.speak(utterance);
+            }
+
+            function normalizeVoiceText(text) {
+                return String(text || '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^\p{L}\p{N}@._\-\s]/gu, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            function spokenEmailToEmail(text) {
+                let value = String(text || '')
+                    .toLowerCase()
+                    .replace(/\s+at\s+/g, '@')
+                    .replace(/\s+arobase\s+/g, '@')
+                    .replace(/\s+dot\s+/g, '.')
+                    .replace(/\s+point\s+/g, '.')
+                    .replace(/\s+underscore\s+/g, '_')
+                    .replace(/\s+dash\s+/g, '-')
+                    .replace(/\s+hyphen\s+/g, '-')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                const domainMap = {
+                    gmail: 'gmail.com',
+                    'gmail com': 'gmail.com',
+                    googlemail: 'gmail.com',
+                    hotmail: 'hotmail.com',
+                    'hotmail com': 'hotmail.com',
+                    outlook: 'outlook.com',
+                    'outlook com': 'outlook.com',
+                    yahoo: 'yahoo.com',
+                    'yahoo com': 'yahoo.com'
+                };
+
+                if (!value.includes('@')) {
+                    for (const spokenDomain in domainMap) {
+                        if (value.endsWith(' ' + spokenDomain)) {
+                            const localPart = value.slice(0, -spokenDomain.length).trim().replace(/\s+/g, '');
+                            return localPart + '@' + domainMap[spokenDomain];
+                        }
+                    }
+                }
+
+                return value.replace(/\s+/g, '');
+            }
+
+            function extractDictatedText(originalText) {
+                const patterns = [
+                    /^write\s+(.+)$/i,
+                    /^type\s+(.+)$/i,
+                    /^enter\s+(.+)$/i,
+                    /^put\s+(.+)$/i,
+                    /^my name is\s+(.+)$/i,
+                    /^name is\s+(.+)$/i,
+                    /^my full name is\s+(.+)$/i,
+                    /^full name is\s+(.+)$/i,
+                    /^my email is\s+(.+)$/i,
+                    /^email is\s+(.+)$/i,
+                    /^my password is\s+(.+)$/i,
+                    /^password is\s+(.+)$/i
+                ];
+
+                for (const pattern of patterns) {
+                    const match = String(originalText || '').match(pattern);
+
+                    if (match && match[1]) {
+                        return match[1].trim();
+                    }
+                }
+
+                return null;
+            }
+
+            function setInputValue(input, value) {
+                if (!input) {
+                    return;
+                }
+
+                input.value = value;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            function focusFullNameField() {
+                activeVoiceField = 'fullName';
+                fullNameInput.focus();
+                setVoiceStatus('Full name field selected. Press Space and say: write your full name.');
+                speakRegister('Full name field selected. Press Space and say, write your full name.');
+            }
+
+            function focusEmailField() {
+                activeVoiceField = 'email';
+                emailInput.focus();
+                setVoiceStatus('Email field selected. Press Space and say: write your email address.');
+                speakRegister('Email field selected. Press Space and say, write your email address.');
+            }
+
+            function focusPasswordField() {
+                activeVoiceField = 'password';
+                passwordInput.focus();
+                setVoiceStatus('Password field selected. Press Space and say: write your password.');
+                speakRegister('Password field selected. Press Space and say, write your password.');
+            }
+
+            function focusRepeatPasswordField() {
+                activeVoiceField = 'repeatPassword';
+                passwordConfirmationInput.focus();
+                setVoiceStatus('Repeat password field selected. Press Space and say: write your password again.');
+                speakRegister('Repeat password field selected. Press Space and say, write your password again.');
+            }
+
+            function typeIntoActiveField(originalText) {
+                const dictatedText = extractDictatedText(originalText);
+
+                if (!dictatedText) {
+                    return false;
+                }
+
+                if (activeVoiceField === 'fullName' || document.activeElement === fullNameInput) {
+                    setInputValue(fullNameInput, dictatedText);
+                    setVoiceStatus('Full name written. Say email field next.');
+                    speakRegister('Full name written. Say email field next.');
+                    return true;
+                }
+
+                if (activeVoiceField === 'email' || document.activeElement === emailInput) {
+                    const email = spokenEmailToEmail(dictatedText);
+                    setInputValue(emailInput, email);
+                    setVoiceStatus('Email written: ' + email + '. Say password field next.');
+                    speakRegister('Email written. Say password field next.');
+                    return true;
+                }
+
+                if (activeVoiceField === 'password' || document.activeElement === passwordInput) {
+                    const password = dictatedText.replace(/\s+/g, '');
+                    setInputValue(passwordInput, password);
+                    setVoiceStatus('Password written. Say repeat password next.');
+                    speakRegister('Password written. Say repeat password next.');
+                    return true;
+                }
+
+                if (activeVoiceField === 'repeatPassword' || document.activeElement === passwordConfirmationInput) {
+                    const password = dictatedText.replace(/\s+/g, '');
+                    setInputValue(passwordConfirmationInput, password);
+                    setVoiceStatus('Repeated password written. Say accept terms, then say register.');
+                    speakRegister('Repeated password written. Say accept terms, then say register.');
+                    return true;
+                }
+
+                return false;
+            }
+
+            function acceptTerms() {
+                termsCheckbox.checked = true;
+                termsCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                setVoiceStatus('Terms accepted. Say register to create your account.');
+                speakRegister('Terms accepted. Say register to create your account.');
+            }
+
+            function submitRegistration() {
+                if (!fullNameInput.value.trim()) {
+                    focusFullNameField();
+                    return;
+                }
+
+                if (!emailInput.value.trim()) {
+                    focusEmailField();
+                    return;
+                }
+
+                if (!passwordInput.value.trim()) {
+                    focusPasswordField();
+                    return;
+                }
+
+                if (!passwordConfirmationInput.value.trim()) {
+                    focusRepeatPasswordField();
+                    return;
+                }
+
+                if (passwordInput.value !== passwordConfirmationInput.value) {
+                    setVoiceStatus('The two passwords do not match. Please repeat the password again.', true);
+                    speakRegister('The two passwords do not match. Please repeat the password again.');
+                    focusRepeatPasswordField();
+                    return;
+                }
+
+                if (!termsCheckbox.checked) {
+                    acceptTerms();
+                    return;
+                }
+
+                setVoiceStatus('Creating your account.');
+                speakRegister('Creating your account.');
+                submitButton.click();
+            }
+
+            function openLoginPage() {
+                if (!loginLink) {
+                    setVoiceStatus('Login link was not found.', true);
+                    speakRegister('Login link was not found.');
+                    return;
+                }
+
+                speakRegister('Opening login page.');
+                window.location.href = loginLink.href;
+            }
+
+            function readRegisterHelp() {
+                const message =
+                    'You are on the registration page. Press Space to speak. ' +
+                    'Say full name, then say write your full name. ' +
+                    'Say email field, then say write your email address. For example, write abbott gmail. ' +
+                    'Say password field, then say write your password. ' +
+                    'Say repeat password, then say write your password again. ' +
+                    'Say accept terms. Then say register. ' +
+                    'Say login page if you already have an account.';
+
+                setVoiceStatus(message);
+                speakRegister(message);
+            }
+
+            function handleRegisterVoiceCommand(text) {
+                const normalized = normalizeVoiceText(text);
+
+                console.log('REGISTER VOICE COMMAND:', normalized);
+
+                if (!normalized) {
+                    speakRegister('I did not hear a command. Press Space and try again.');
+                    return;
+                }
+
+                if (typeIntoActiveField(text)) {
+                    return;
+                }
+
+                if (
+                    normalized === 'help' ||
+                    normalized === 'what can i say' ||
+                    normalized === 'read page' ||
+                    normalized === 'read this page' ||
+                    normalized === 'instructions'
+                ) {
+                    readRegisterHelp();
+                    return;
+                }
+
+                if (
+                    normalized.includes('full name') ||
+                    normalized.includes('name field') ||
+                    normalized === 'name'
+                ) {
+                    focusFullNameField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('email field') ||
+                    normalized.includes('select email') ||
+                    normalized.includes('focus email') ||
+                    normalized === 'email'
+                ) {
+                    focusEmailField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('repeat password') ||
+                    normalized.includes('confirm password') ||
+                    normalized.includes('password confirmation')
+                ) {
+                    focusRepeatPasswordField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('password field') ||
+                    normalized.includes('select password') ||
+                    normalized.includes('focus password') ||
+                    normalized === 'password'
+                ) {
+                    focusPasswordField();
+                    return;
+                }
+
+                if (
+                    normalized.includes('accept terms') ||
+                    normalized.includes('agree terms') ||
+                    normalized.includes('i agree') ||
+                    normalized.includes('terms')
+                ) {
+                    acceptTerms();
+                    return;
+                }
+
+                if (
+                    normalized === 'register' ||
+                    normalized === 'sign up' ||
+                    normalized === 'create account' ||
+                    normalized === 'submit registration' ||
+                    normalized.includes('create my account')
+                ) {
+                    submitRegistration();
+                    return;
+                }
+
+                if (
+                    normalized.includes('login page') ||
+                    normalized.includes('go to login') ||
+                    normalized.includes('already have account') ||
+                    normalized.includes('i am already a member')
+                ) {
+                    openLoginPage();
+                    return;
+                }
+
+                setVoiceStatus('I heard: "' + text + '". Say help to hear registration commands.');
+                speakRegister('I heard ' + text + '. Say help to hear registration commands.');
+            }
+
+            function startRegisterVoiceListening() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                if (!SpeechRecognition) {
+                    setVoiceStatus('Voice recognition is not supported in this browser. Please use Chrome or Edge.', true);
+                    speakRegister('Voice recognition is not supported in this browser.');
+                    return;
+                }
+
+                if (registerIsListening) {
+                    return;
+                }
+
+                if (!registerRecognition) {
+                    registerRecognition = new SpeechRecognition();
+                    registerRecognition.lang = navigator.language || 'en-US';
+                    registerRecognition.interimResults = false;
+                    registerRecognition.continuous = false;
+
+                    registerRecognition.onstart = function () {
+                        registerIsListening = true;
+                        setVoiceStatus('Listening now. Say full name, email field, password field, accept terms, register, or help.');
+                    };
+
+                    registerRecognition.onend = function () {
+                        registerIsListening = false;
+                    };
+
+                    registerRecognition.onerror = function (event) {
+                        registerIsListening = false;
+
+                        let message = 'Voice recognition error. Please press Space and try again.';
+
+                        if (event && event.error === 'not-allowed') {
+                            message = 'Microphone permission is blocked. Please allow microphone access for this site.';
+                        }
+
+                        if (event && event.error === 'no-speech') {
+                            message = 'I did not hear anything. Press Space and try again.';
+                        }
+
+                        if (event && event.error === 'audio-capture') {
+                            message = 'No microphone was found. Please check your microphone.';
+                        }
+
+                        if (event && event.error === 'network') {
+                            message = 'Voice recognition needs an internet connection.';
+                        }
+
+                        setVoiceStatus(message, true);
+                        speakRegister(message);
+                    };
+
+                    registerRecognition.onresult = function (event) {
+                        const text = event.results[0][0].transcript.trim();
+
+                        setVoiceStatus('I heard: ' + text);
+                        handleRegisterVoiceCommand(text);
+                    };
+                }
+
+                try {
+                    window.speechSynthesis?.cancel();
+                    registerRecognition.lang = navigator.language || 'en-US';
+                    registerRecognition.start();
+                } catch (error) {
+                    setVoiceStatus('The microphone is already starting. Please wait a moment.');
+                }
+            }
+
+            function stopRegisterVoiceListening() {
+                if (registerRecognition && registerIsListening) {
+                    registerRecognition.stop();
+                }
+            }
+
+            function toggleRegisterVoiceListening() {
+                if (registerIsListening) {
+                    stopRegisterVoiceListening();
+                } else {
+                    startRegisterVoiceListening();
+                }
+            }
+
+            document.addEventListener('keydown', function (event) {
+                const isPlainSpace =
+                    event.code === 'Space' &&
+                    !event.ctrlKey &&
+                    !event.altKey &&
+                    !event.shiftKey &&
+                    !event.metaKey;
+
+                if (!isPlainSpace) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                toggleRegisterVoiceListening();
+            }, true);
+
+            setVoiceStatus('Press Space to speak. Say “help” to hear registration commands.');
         });
     </script>
 {% endblock %}

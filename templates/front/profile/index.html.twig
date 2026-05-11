@@ -2,6 +2,12 @@
 
 {% block front_content %}
     <main class="profile-page">
+    {% if app.request.query.get('cameraLogin') == 'enabled' %}
+    <div class="profile-passkey-status success">
+        <i data-lucide="check-circle"></i>
+        <span>Camera login is enabled successfully. You can now use it from the login page.</span>
+    </div>
+{% endif %}
         <section class="profile-hero">
             <div class="profile-hero-bg" aria-hidden="true">
                 <span class="profile-orb profile-orb-one"></span>
@@ -60,13 +66,72 @@
             </article>
         </section>
 
+        <section class="profile-passkey-card">
+            <div class="profile-section-header">
+                <div>
+                    <span class="passkey-label">
+                        <i data-lucide="scan-face"></i>
+                        Secure Device Login
+                    </span>
+
+                    <h2>Enable Passkey Login</h2>
+
+                    <p>
+                        Add Passkey / Windows Hello login to sign in faster with Face ID,
+                        fingerprint, device PIN, or a security key when supported by the device.
+                    </p>
+                </div>
+
+                <div class="passkey-icon">
+                    <i data-lucide="scan-face"></i>
+                </div>
+            </div>
+
+            <div id="passkeyProfileStatus" class="profile-passkey-status" hidden>
+                <i data-lucide="info"></i>
+                <span></span>
+            </div>
+
+            <button type="button" id="enablePasskeyButton" class="profile-btn profile-btn-passkey">
+                <i data-lucide="scan-face"></i>
+                Enable Passkey Login
+            </button>
+        </section>
+
+        <section class="profile-camera-card">
+            <div class="profile-section-header">
+                <div>
+                    <span class="camera-label">
+                        <i data-lucide="camera"></i>
+                        Camera Accessibility Login
+                    </span>
+
+                    <h2>Enable Camera Login</h2>
+
+                    <p>
+                        Use your webcam for an accessibility-friendly login flow with liveness checks:
+                        look at the camera, close your eyes, then open your eyes.
+                    </p>
+                </div>
+
+                <div class="camera-icon">
+                    <i data-lucide="camera"></i>
+                </div>
+            </div>
+
+            <a href="{{ path('front_camera_login_setup') }}" class="profile-btn profile-btn-camera">
+                <i data-lucide="camera"></i>
+                Enable Camera Login
+            </a>
+        </section>
+
         <section class="profile-action-card">
             <div class="profile-section-header">
                 <div>
                     <span class="section-label">Account actions</span>
                     <h2>Manage your account</h2>
                     <p>
-                        Update your profile information or change your password securely.
+                        Update your profile information, change your password, or manage accessible login options.
                     </p>
                 </div>
 
@@ -84,6 +149,11 @@
                 <a href="{{ path('front_profile_change_password') }}" class="profile-btn profile-btn-secondary">
                     <i data-lucide="key-round"></i>
                     Change Password
+                </a>
+
+                <a href="{{ path('front_camera_login_setup') }}" class="profile-btn profile-btn-secondary">
+                    <i data-lucide="camera"></i>
+                    Camera Login Setup
                 </a>
             </div>
         </section>
@@ -219,7 +289,9 @@
 
         .profile-kicker,
         .section-label,
-        .danger-label {
+        .danger-label,
+        .passkey-label,
+        .camera-label {
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -239,7 +311,9 @@
             margin-bottom: 14px;
         }
 
-        .profile-kicker svg {
+        .profile-kicker svg,
+        .passkey-label svg,
+        .camera-label svg {
             width: 15px;
             height: 15px;
         }
@@ -269,6 +343,8 @@
 
         .profile-card,
         .profile-action-card,
+        .profile-passkey-card,
+        .profile-camera-card,
         .profile-danger-card {
             background: #ffffff;
             border: 1px solid #e2e8f0;
@@ -286,6 +362,8 @@
 
         .profile-card-icon,
         .profile-section-icon,
+        .passkey-icon,
+        .camera-icon,
         .danger-icon {
             flex: 0 0 auto;
             width: 56px;
@@ -302,8 +380,24 @@
             border: 1px solid #dbeafe;
         }
 
+        .passkey-icon {
+            color: #ffffff;
+            background: linear-gradient(135deg, #0f172a, #2563eb);
+            border: 1px solid rgba(147, 197, 253, 0.55);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.22);
+        }
+
+        .camera-icon {
+            color: #ffffff;
+            background: linear-gradient(135deg, #064e3b, #059669);
+            border: 1px solid rgba(134, 239, 172, 0.65);
+            box-shadow: 0 16px 34px rgba(5, 150, 105, 0.22);
+        }
+
         .profile-card-icon svg,
         .profile-section-icon svg,
+        .passkey-icon svg,
+        .camera-icon svg,
         .danger-icon svg {
             width: 26px;
             height: 26px;
@@ -339,8 +433,24 @@
         }
 
         .profile-action-card,
+        .profile-passkey-card,
+        .profile-camera-card,
         .profile-danger-card {
             padding: 26px;
+        }
+
+        .profile-passkey-card {
+            background:
+                radial-gradient(circle at 92% 10%, rgba(37, 99, 235, 0.10), transparent 28%),
+                #ffffff;
+            border-color: #bfdbfe;
+        }
+
+        .profile-camera-card {
+            background:
+                radial-gradient(circle at 92% 10%, rgba(5, 150, 105, 0.12), transparent 28%),
+                #ffffff;
+            border-color: #bbf7d0;
         }
 
         .profile-section-header {
@@ -355,6 +465,20 @@
             color: #2563eb;
             background: #eff6ff;
             border: 1px solid #dbeafe;
+            margin-bottom: 10px;
+        }
+
+        .passkey-label {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            margin-bottom: 10px;
+        }
+
+        .camera-label {
+            color: #047857;
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
             margin-bottom: 10px;
         }
 
@@ -402,9 +526,11 @@
             gap: 9px;
             padding: 0 18px;
             border-radius: 16px;
+            border: 0;
             text-decoration: none;
             font-size: 15px;
             font-weight: 950;
+            cursor: pointer;
             transition: 180ms ease;
         }
 
@@ -429,10 +555,59 @@
             border: 1px solid #dbeafe;
         }
 
+        .profile-btn-passkey {
+            width: 100%;
+            min-height: 58px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #0f172a, #1d4ed8);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.28);
+        }
+
+        .profile-btn-camera {
+            width: 100%;
+            min-height: 58px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #064e3b, #059669);
+            box-shadow: 0 16px 34px rgba(5, 150, 105, 0.26);
+        }
+
         .profile-btn-danger {
             color: #ffffff;
             background: linear-gradient(135deg, #dc2626, #b91c1c);
             box-shadow: 0 16px 34px rgba(220, 38, 38, 0.20);
+        }
+
+        .profile-passkey-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            font-size: 14px;
+            font-weight: 850;
+            line-height: 1.45;
+        }
+
+        .profile-passkey-status.error {
+            color: #991b1b;
+            background: #fee2e2;
+            border-color: #fecaca;
+        }
+
+        .profile-passkey-status.success {
+            color: #166534;
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+
+        .profile-passkey-status svg {
+            width: 19px;
+            height: 19px;
+            flex: 0 0 auto;
         }
 
         @keyframes profileAurora {
@@ -491,6 +666,8 @@
             .profile-hero,
             .profile-card,
             .profile-action-card,
+            .profile-passkey-card,
+            .profile-camera-card,
             .profile-danger-card {
                 border-radius: 22px;
             }
@@ -515,4 +692,233 @@
             }
         }
     </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+
+            const enablePasskeyButton = document.getElementById('enablePasskeyButton');
+            const passkeyProfileStatus = document.getElementById('passkeyProfileStatus');
+
+            function setProfilePasskeyStatus(message, type) {
+                if (!passkeyProfileStatus) {
+                    return;
+                }
+
+                const span = passkeyProfileStatus.querySelector('span');
+
+                if (span) {
+                    span.textContent = message;
+                }
+
+                passkeyProfileStatus.hidden = false;
+                passkeyProfileStatus.classList.remove('error', 'success');
+
+                if (type) {
+                    passkeyProfileStatus.classList.add(type);
+                }
+            }
+
+            function base64UrlToArrayBuffer(base64Url) {
+                const stringValue = String(base64Url || '');
+                const padding = '='.repeat((4 - stringValue.length % 4) % 4);
+                const base64 = (stringValue + padding)
+                    .replace(/-/g, '+')
+                    .replace(/_/g, '/');
+
+                const raw = window.atob(base64);
+                const buffer = new ArrayBuffer(raw.length);
+                const view = new Uint8Array(buffer);
+
+                for (let i = 0; i < raw.length; i++) {
+                    view[i] = raw.charCodeAt(i);
+                }
+
+                return buffer;
+            }
+
+            function arrayBufferToBase64Url(buffer) {
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+
+                bytes.forEach(function (byte) {
+                    binary += String.fromCharCode(byte);
+                });
+
+                return window.btoa(binary)
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/g, '');
+            }
+
+            function extractCreationOptions(rawOptions) {
+                return (
+                    rawOptions.publicKey ||
+                    rawOptions.publicKeyCredentialCreationOptions ||
+                    rawOptions.data?.publicKey ||
+                    rawOptions.data?.publicKeyCredentialCreationOptions ||
+                    rawOptions.data ||
+                    rawOptions
+                );
+            }
+
+            function preparePublicKeyCreationOptions(options) {
+                const preparedOptions = { ...options };
+
+                preparedOptions.challenge = base64UrlToArrayBuffer(preparedOptions.challenge);
+
+                if (preparedOptions.user && preparedOptions.user.id) {
+                    preparedOptions.user = {
+                        ...preparedOptions.user,
+                        id: base64UrlToArrayBuffer(preparedOptions.user.id)
+                    };
+                }
+
+                if (Array.isArray(preparedOptions.excludeCredentials)) {
+                    preparedOptions.excludeCredentials = preparedOptions.excludeCredentials.map(function (credential) {
+                        return {
+                            ...credential,
+                            id: base64UrlToArrayBuffer(credential.id)
+                        };
+                    });
+                }
+
+                if (!Array.isArray(preparedOptions.pubKeyCredParams) || preparedOptions.pubKeyCredParams.length === 0) {
+                    preparedOptions.pubKeyCredParams = [
+                        { type: 'public-key', alg: -7 },
+                        { type: 'public-key', alg: -257 }
+                    ];
+                }
+
+                return preparedOptions;
+            }
+
+            function registrationCredentialToJSON(credential) {
+                return {
+                    id: credential.id,
+                    rawId: arrayBufferToBase64Url(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        attestationObject: arrayBufferToBase64Url(credential.response.attestationObject),
+                        clientDataJSON: arrayBufferToBase64Url(credential.response.clientDataJSON)
+                    }
+                };
+            }
+
+            async function enablePasskeyLogin() {
+                if (!window.PublicKeyCredential || !navigator.credentials) {
+                    setProfilePasskeyStatus(
+                        'Passkey login is not supported in this browser. Please use Chrome, Edge, or Safari.',
+                        'error'
+                    );
+                    return;
+                }
+
+                if (!enablePasskeyButton) {
+                    setProfilePasskeyStatus('Passkey login button was not found on this page.', 'error');
+                    return;
+                }
+
+                enablePasskeyButton.disabled = true;
+                setProfilePasskeyStatus('Opening your device passkey setup...', null);
+
+                try {
+                    const optionsResponse = await fetch('/front/profile/passkey/options', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+
+                    if (!optionsResponse.ok) {
+                        const errorText = await optionsResponse.text();
+                        console.error('PASSKEY OPTIONS SERVER RESPONSE:', errorText);
+
+                        throw new Error(
+                            'Could not start passkey setup. Server said: ' +
+                            errorText.slice(0, 1000)
+                        );
+                    }
+
+                    const rawOptions = await optionsResponse.json();
+                    console.log('PASSKEY REGISTER OPTIONS:', rawOptions);
+
+                    const publicKeyOptions = extractCreationOptions(rawOptions);
+
+                    if (!publicKeyOptions.challenge) {
+                        throw new Error('Passkey setup options are missing challenge.');
+                    }
+
+                    if (!publicKeyOptions.user || !publicKeyOptions.user.id) {
+                        throw new Error('Passkey setup options are missing user ID.');
+                    }
+
+                    const preparedPublicKeyOptions = preparePublicKeyCreationOptions(publicKeyOptions);
+
+                    console.log('PASSKEY PREPARED REGISTER OPTIONS:', preparedPublicKeyOptions);
+
+                    const credential = await navigator.credentials.create({
+                        publicKey: preparedPublicKeyOptions
+                    });
+
+                    if (!credential) {
+                        throw new Error('No passkey was created.');
+                    }
+
+                    const payload = registrationCredentialToJSON(credential);
+
+                    console.log('PASSKEY REGISTER PAYLOAD:', payload);
+
+                    const registerResponse = await fetch('/front/profile/passkey/register', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!registerResponse.ok) {
+                        const errorText = await registerResponse.text();
+                        console.error('PASSKEY REGISTER SERVER RESPONSE:', errorText);
+
+                        throw new Error(
+                            'Passkey setup failed. Server said: ' +
+                            errorText.slice(0, 1000)
+                        );
+                    }
+
+                    const registerResultText = await registerResponse.text();
+
+                    if (registerResultText) {
+                        console.log('PASSKEY REGISTER SUCCESS RESPONSE:', registerResultText);
+                    }
+
+                    setProfilePasskeyStatus(
+                        'Passkey login is now enabled. Next time, you can sign in with Passkey / Windows Hello from the login page.',
+                        'success'
+                    );
+                } catch (error) {
+                    console.error('PASSKEY REGISTRATION ERROR:', error);
+
+                    setProfilePasskeyStatus(
+                        error.message || 'Passkey setup failed. Please try again.',
+                        'error'
+                    );
+
+                    enablePasskeyButton.disabled = false;
+                }
+            }
+
+            if (enablePasskeyButton) {
+                enablePasskeyButton.addEventListener('click', enablePasskeyLogin);
+            }
+        });
+    </script>
 {% endblock %}
