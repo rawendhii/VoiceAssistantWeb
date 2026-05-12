@@ -37,10 +37,29 @@ security:
                 path: /
 
     access_control:
+        - { path: ^/api/auth/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
+
+        - { path: ^/api/users, roles: PUBLIC_ACCESS }
+        - { path: ^/api/roles, roles: PUBLIC_ACCESS }
+        - { path: ^/api/managed-files, roles: PUBLIC_ACCESS }
+        - { path: ^/api/voice-commands, roles: PUBLIC_ACCESS }
+        - { path: ^/api/command-history, roles: PUBLIC_ACCESS }
+
+        - { path: ^/api/desktop/ping, roles: PUBLIC_ACCESS }
+        - { path: ^/api/desktop/interpret, roles: PUBLIC_ACCESS }
+
+        - { path: ^/desktop/speech-bridge, roles: PUBLIC_ACCESS }
+        - { path: ^/api/desktop/speech, roles: PUBLIC_ACCESS }
+
+        - { path: ^/api/voice/interpret, roles: PUBLIC_ACCESS }
+
         - { path: ^/passkey/login, roles: PUBLIC_ACCESS }
         - { path: ^/camera-login, roles: PUBLIC_ACCESS }
+
         - { path: ^/front/profile/passkey, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/front/profile/camera-login, roles: IS_AUTHENTICATED_FULLY }
+
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/front, roles: ROLE_USER }
         - { path: ^/voice, roles: ROLE_USER }

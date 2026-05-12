@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Desktop Speech Bridge</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #020617, #0f172a);
+            color: white;
+        }
+
+        .card {
+            width: min(520px, calc(100vw - 32px));
+            padding: 32px;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 32px;
+        }
+
+        p {
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        button {
+            margin-top: 18px;
+            min-width: 180px;
+            min-height: 54px;
+            border: none;
+            border-radius: 16px;
+            background: #2563eb;
+            color: white;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        button.listening {
+            background: #dc2626;
+        }
+
+        .badge {
+            display: inline-flex;
+            margin-top: 18px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: #1e293b;
+            color: #93c5fd;
+            font-weight: 800;
+        }
+
+        .recognized {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.08);
+            min-height: 54px;
+            color: #e0f2fe;
+            font-size: 18px;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        select {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>Desktop Speech Bridge</h1>
+    <p>
+        This page uses the browser Web Speech API, then sends recognized commands to your JavaFX desktop app.
+    </p>
+
+    <select id="languageSelect">
+        <option value="en-US">English</option>
+        <option value="fr-FR">Français</option>
+        <option value="ar-TN">Tunisian Arabic</option>
+        <option value="ar-SA">Arabic</option>
+    </select>
+
+    <br>
+
+    <button id="toggleButton" type="button">Start Listening</button>
+
+    <div id="statusBadge" class="badge">Idle</div>
+
+    <div id="recognizedText" class="recognized">
+        Nothing recognized yet.
+    </div>
+</div>
+
+<script>
+    const userId = {{ userId|default(0) }};
+    const toggleButton = document.getElementById('toggleButton');
+    const statusBadge = document.getElementById('statusBadge');
+    const recognizedText = document.getElementById('recognizedText');
+    const languageSelect = document.getElementById('languageSelect');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    let recognition = null;
+    let listening = false;
+    let starting = false;
+
+    function setStatus(text, isListening = false) {
+        statusBadge.textContent = text;
+        toggleButton.textContent = isListening ? 'Stop Listening' : 'Start Listening';
+        toggleButton.classList.toggle('listening', isListening);
+    }
+
+    function speak(text) {
+        if (!('speechSynthesis' in window) || !text) {
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = languageSelect.value || 'en-US';
+        utterance.rate = 0.95;
+        speechSynthesis.speak(utterance);
+    }
+
+    async function pushCommand(text) {
+        const response = await fetch('/api/desktop/speech/push', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: userId,
+                text: text,
+                language: languageSelect.value || 'en-US'
+            })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || 'Could not push command.');
+        }
+    }
+
+    function startListening() {
+        if (!SpeechRecognition) {
+            setStatus('Not supported');
+            recognizedText.textContent = 'Speech recognition is not supported. Please use Google Chrome.';
+            speak('Speech recognition is not supported. Please use Google Chrome.');
+            return;
+        }
+
+        if (userId <= 0) {
+            setStatus('Missing user');
+            recognizedText.textContent = 'Missing desktop user ID.';
+            return;
+        }
+
+        if (listening || starting) {
+            return;
+        }
+
+        if (!recognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = function () {
+                starting = false;
+                listening = true;
+                setStatus('Listening', true);
+                recognizedText.textContent = 'Listening now...';
+            };
+
+            recognition.onend = function () {
+                starting = false;
+                listening = false;
+                setStatus('Idle', false);
+            };
+
+            recognition.onerror = function (event) {
+                starting = false;
+                listening = false;
+                setStatus('Error', false);
+
+                let message = 'Speech recognition error: ' + event.error;
+
+                if (event.error === 'not-allowed') {
+                    message = 'Microphone permission denied. Please allow microphone access.';
+                } else if (event.error === 'no-speech') {
+                    message = 'I did not hear anything. Try again.';
+                } else if (event.error === 'audio-capture') {
+                    message = 'No microphone found.';
+                }
+
+                recognizedText.textContent = message;
+                speak(message);
+            };
+
+            recognition.onresult = async function (event) {
+                const text = event.results[0][0].transcript.trim();
+
+                recognizedText.textContent = text;
+                setStatus('Sending to desktop', false);
+
+                try {
+                    await pushCommand(text);
+                    setStatus('Sent to desktop', false);
+                    speak('Command sent to desktop.');
+                } catch (error) {
+                    setStatus('Error', false);
+                    recognizedText.textContent = error.message;
+                    speak(error.message);
+                }
+            };
+        }
+
+        try {
+            recognition.lang = languageSelect.value || 'en-US';
+            starting = true;
+            recognition.start();
+        } catch (error) {
+            starting = false;
+            setStatus('Error', false);
+        }
+    }
+
+    function stopListening() {
+        if (recognition && listening) {
+            recognition.stop();
+        }
+
+        listening = false;
+        starting = false;
+        setStatus('Idle', false);
+    }
+
+    toggleButton.addEventListener('click', function () {
+        if (listening) {
+            stopListening();
+        } else {
+            startListening();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.code === 'Space') {
+            event.preventDefault();
+
+            if (listening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+    });
+
+    setStatus('Idle', false);
+</script>
+</body>
+</html>
