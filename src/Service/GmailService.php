@@ -19,7 +19,16 @@ class GmailService
 
     public function isConnected(): bool
     {
-        return is_array($this->getToken());
+        $token = $this->getToken();
+
+        return is_array($token) && isset($token['access_token']);
+    }
+
+    public function getConnectUrl(): string
+    {
+        $client = $this->createGoogleClient();
+
+        return $client->createAuthUrl();
     }
 
     public function sendEmail(string $to, string $subject, string $body): array
@@ -33,7 +42,7 @@ class GmailService
 
         $token = $this->getToken();
 
-        if (!is_array($token)) {
+        if (!is_array($token) || !isset($token['access_token'])) {
             return [
                 'success' => false,
                 'message' => 'Gmail is not connected. Please connect Gmail first.',
@@ -52,6 +61,8 @@ class GmailService
             }
 
             if (!$refreshToken) {
+                $this->clearToken();
+
                 return [
                     'success' => false,
                     'message' => 'Gmail session expired. Please reconnect Gmail.',
@@ -62,10 +73,14 @@ class GmailService
             $newToken = $client->fetchAccessTokenWithRefreshToken($refreshToken);
 
             if (isset($newToken['error'])) {
+                $this->clearToken();
+
                 return [
                     'success' => false,
                     'message' => 'Could not refresh Gmail access. Please reconnect Gmail.',
                     'connectUrl' => '/google/oauth/connect',
+                    'error' => $newToken['error'],
+                    'errorDescription' => $newToken['error_description'] ?? null,
                 ];
             }
 
@@ -79,19 +94,57 @@ class GmailService
             $client->setAccessToken($token);
         }
 
-        $service = new Gmail($client);
+        try {
+            $service = new Gmail($client);
 
-        $rawMessage = $this->createRawMessage($to, $subject, $body);
+            $rawMessage = $this->createRawMessage($to, $subject, $body);
 
-        $message = new Message();
-        $message->setRaw($rawMessage);
+            $message = new Message();
+            $message->setRaw($rawMessage);
 
-        $sentMessage = $service->users_messages->send('me', $message);
+            $sentMessage = $service->users_messages->send('me', $message);
+
+            return [
+                'success' => true,
+                'message' => 'Email sent successfully.',
+                'gmailMessageId' => $sentMessage->getId(),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to send email through Gmail.',
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    public function saveOAuthTokenFromCode(string $code): array
+    {
+        $client = $this->createGoogleClient();
+
+        $token = $client->fetchAccessTokenWithAuthCode($code);
+
+        if (isset($token['error'])) {
+            return [
+                'success' => false,
+                'message' => 'Could not connect Gmail.',
+                'error' => $token['error'],
+                'errorDescription' => $token['error_description'] ?? null,
+            ];
+        }
+
+        if (!isset($token['access_token'])) {
+            return [
+                'success' => false,
+                'message' => 'Google did not return an access token.',
+            ];
+        }
+
+        $this->saveToken($token);
 
         return [
             'success' => true,
-            'message' => 'Email sent successfully.',
-            'gmailMessageId' => $sentMessage->getId(),
+            'message' => 'Gmail connected successfully.',
         ];
     }
 
@@ -112,23 +165,35 @@ class GmailService
     private function createGoogleClient(): GoogleClient
     {
         $client = new GoogleClient();
+
         $client->setClientId($this->googleClientId);
         $client->setClientSecret($this->googleClientSecret);
         $client->setRedirectUri($this->googleRedirectUri);
+
         $client->setAccessType('offline');
         $client->setPrompt('consent');
-        $client->addScope('https://www.googleapis.com/auth/gmail.send');
+
+        $client->addScope(Gmail::GMAIL_SEND);
 
         return $client;
     }
 
     private function getToken(): ?array
     {
-        return $this->requestStack->getSession()->get('google_access_token');
+        $session = $this->requestStack->getSession();
+
+        $token = $session->get('google_access_token');
+
+        return is_array($token) ? $token : null;
     }
 
     private function saveToken(array $token): void
     {
         $this->requestStack->getSession()->set('google_access_token', $token);
+    }
+
+    private function clearToken(): void
+    {
+        $this->requestStack->getSession()->remove('google_access_token');
     }
 }

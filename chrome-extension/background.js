@@ -991,4 +991,42 @@ function waitForTabLoad(tabId) {
 
         chrome.tabs.onUpdated.addListener(listener);
     });
+    chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    if (!message || !message.type) {
+        sendResponse({
+            success: false,
+            message: 'Invalid external message.'
+        });
+        return true;
+    }
+
+    if (message.type === 'PING_EXTENSION' || message.type === 'PING') {
+        sendResponse({
+            success: true,
+            message: 'Extension connected.',
+            assistantTabId: assistantTabId,
+            controlledTabId: controlledTabId,
+            assistantOrigin: assistantOrigin
+        });
+        return true;
+    }
+
+    if (message.type === 'GET_ASSISTANT_STATUS') {
+        sendResponse({
+            success: true,
+            assistantTabId: assistantTabId,
+            controlledTabId: controlledTabId,
+            assistantOrigin: assistantOrigin,
+            context: buildMemoryContext(message.browserContext || null)
+        });
+        return true;
+    }
+
+    sendResponse({
+        success: false,
+        message: 'Unsupported external message type: ' + message.type
+    });
+
+    return true;
+});
 }

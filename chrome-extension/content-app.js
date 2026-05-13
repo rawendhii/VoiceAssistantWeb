@@ -194,3 +194,38 @@ window.addEventListener('message', function (event) {
         });
     }
 });
+let extensionConnected = false;
+
+window.addEventListener('message', function (event) {
+    if (event.source !== window) {
+        return;
+    }
+
+    if (!event.data || event.data.source !== 'VOICE_ASSISTANT_EXTENSION') {
+        return;
+    }
+
+    if (event.data.type === 'EXTENSION_READY') {
+        extensionConnected = true;
+        console.log('Extension connected:', event.data.context);
+    }
+
+    if (event.data.type === 'BROWSER_CONTEXT') {
+        console.log('Browser context:', event.data.context);
+    }
+
+    if (event.data.type === 'BROWSER_ACTION_RESULT') {
+        console.log('Browser action result:', event.data.result);
+    }
+});
+
+function pingExtension() {
+    window.postMessage({
+        source: 'VOICE_ASSISTANT_WEB',
+        type: 'PING_EXTENSION'
+    }, '*');
+}
+
+pingExtension();
+setTimeout(pingExtension, 500);
+setTimeout(pingExtension, 1500);
